@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==============================================================================
+// IDENTITY & AUTHENTICATION (Better Auth + Suvarna Identity)
+// ==============================================================================
+
+model User {
+  id            String       @id @default(uuid())
+  name          String
+  email         String       @unique
+  emailVerified Boolean      @default(false)
+  image         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  members       Member[]
+  invitations   Invitation[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id                   String   @id @default(uuid())
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganizationId String?
+
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(uuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(uuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verifications")
+}
+
+// ==============================================================================
+// MULTI-TENANCY & ROLES (Organization / Tenant Foundation)
+// ==============================================================================
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String       @unique
+  logo        String?
+  metadata    String?
+  createdAt   DateTime     @default(now())
+  members     Member[]
+  invitations Invitation[]
+  branches    Branch[]
+  auditLogs   AuditLog[]
+
+  // Jewellery Business Domain Extensions
+  legalName   String?
+  gstin       String?
+  pan         String?
+  currency    String       @default("INR")
+
+  @@map("organizations")
+}
+
+model Member {
+  id             String                   @id @default(uuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String                   // OWNER | MANAGER | ACCOUNTANT | SALES_STAFF
+  createdAt      DateTime                 @default(now())
+  status         String                   @default("ACTIVE") // ACTIVE | SUSPENDED | INVITED
+  branchAccess   MembershipBranchAccess[]
+
+  @@unique([organizationId, userId])
+  @@map("members")
+}
+
+model Invitation {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String
+  status         String       @default("pending")
+  expiresAt      DateTime
+  inviterId      String
+  user           User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@map("invitations")
+}
+
+// ==============================================================================
+// BRANCH MANAGEMENT & CROSS-TENANT INTEGRITY
+// ==============================================================================
+
+model Branch {
+  id             String                   @id @default(uuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  code           String                   // e.g. "FORT", "VASHI"
+  addressLine1   String?
+  city           String
+  state          String                   @default("Maharashtra")
+  pincode        String?
+  phone          String?
+  isMainBranch   Boolean                  @default(false)
+  isActive       Boolean                  @default(true)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  branchAccess   MembershipBranchAccess[]
+  auditLogs      AuditLog[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, id]) // Composite key for cross-tenant database constraint
+  @@map("branches")
+}
+
+model MembershipBranchAccess {
+  id        String   @id @default(uuid())
+  memberId  String
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([memberId, branchId])
+  @@map("membership_branch_access")
+}
+
+// ==============================================================================
+// PRIVACY-SAFE AUDIT FOUNDATION
+// ==============================================================================
+
+model AuditLog {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action         String        // CREATE | UPDATE | DELETE | ACCESS_DENIED | LOGIN | LOGOUT
+  entityType     String        // Branch | Member | Organization | User
+  entityId       String
+  changedFields  Json?         // Sensitive keys (passwords, tokens, secrets) redacted before persist
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@map("audit_logs")
+}

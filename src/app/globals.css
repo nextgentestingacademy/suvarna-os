@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --suvarna-plum: #542047;
+    --suvarna-plum-deep: #421b48;
+    --suvarna-gold: #d49a24;
+    --suvarna-gold-light: #ffe8a8;
+    --suvarna-cream: #fff8f1;
+    --suvarna-ink: #25203a;
+    --suvarna-muted: #68647a;
+  }
+
+  body {
+    background-color: var(--suvarna-cream);
+    color: var(--suvarna-ink);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+  }
+}
