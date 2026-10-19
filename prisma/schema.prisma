@@ -87,8 +87,9 @@ model Organization {
   createdAt   DateTime     @default(now())
   members     Member[]
   invitations Invitation[]
-  branches    Branch[]
-  auditLogs   AuditLog[]
+  branches     Branch[]
+  branchAccess MembershipBranchAccess[]
+  auditLogs    AuditLog[]
 
   // Jewellery Business Domain Extensions
   legalName   String?
@@ -111,6 +112,7 @@ model Member {
   branchAccess   MembershipBranchAccess[]
 
   @@unique([organizationId, userId])
+  @@unique([organizationId, id])
   @@map("members")
 }
 
@@ -157,13 +159,15 @@ model Branch {
 }
 
 model MembershipBranchAccess {
-  id        String   @id @default(uuid())
-  memberId  String
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  branchId  String
-  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member       @relation(fields: [organizationId, memberId], references: [organizationId, id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Cascade)
+  isDefault      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
 
   @@unique([memberId, branchId])
   @@map("membership_branch_access")

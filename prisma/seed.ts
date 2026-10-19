@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { hashPassword } from 'better-auth/crypto';
 
 const prisma = new PrismaClient();
 
@@ -66,6 +67,8 @@ async function main() {
 
   // 4. Test Personas for Suvarna
   // Note: Password hashes are development-only placeholders for local automated verification.
+  const devPasswordHash = await hashPassword('SuvarnaDev2026!');
+
   const users = [
     {
       name: 'Anil Mehta (Owner)',
@@ -106,6 +109,16 @@ async function main() {
       },
     });
 
+    // Create Better Auth credential account
+    await prisma.account.create({
+      data: {
+        accountId: user.email,
+        providerId: 'credential',
+        userId: user.id,
+        password: devPasswordHash,
+      },
+    });
+
     const member = await prisma.member.create({
       data: {
         organizationId: suvarnaOrg.id,
@@ -118,6 +131,7 @@ async function main() {
     for (const bId of u.branches) {
       await prisma.membershipBranchAccess.create({
         data: {
+          organizationId: suvarnaOrg.id,
           memberId: member.id,
           branchId: bId,
           isDefault: bId === u.defaultBranch,
@@ -158,6 +172,15 @@ async function main() {
     },
   });
 
+  await prisma.account.create({
+    data: {
+      accountId: otherUser.email,
+      providerId: 'credential',
+      userId: otherUser.id,
+      password: devPasswordHash,
+    },
+  });
+
   const otherMember = await prisma.member.create({
     data: {
       organizationId: otherOrg.id,
@@ -169,6 +192,7 @@ async function main() {
 
   await prisma.membershipBranchAccess.create({
     data: {
+      organizationId: otherOrg.id,
       memberId: otherMember.id,
       branchId: thaneBranch.id,
       isDefault: true,

@@ -97,15 +97,39 @@ describe('SecurityContext — Server-Side Tenancy & Branch Resolution', () => {
         targetTenantId: 'org-suvarna-mumbai',
         targetBranchId: 'branch-vashi',
       })
+    ).rejects.toThrow(/You do not have access to branch 'branch-vashi'/);
+  });
+
+  it('PREVENTS INACTIVE ACCESS: rejects when user membership is suspended or invited but not active', async () => {
+    // Mock prisma returning null because status !== 'ACTIVE'
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue(mockUser),
+      },
+      member: {
+        findFirst: vi.fn().mockImplementation(({ where }) => {
+          // Status filter in where clause prevents finding suspended members
+          if (where.status === 'ACTIVE') {
+            return Promise.resolve(null);
+          }
+          return Promise.resolve({ ...mockSuvarnaMember, status: 'SUSPENDED' });
+        }),
+      },
+    } as unknown as PrismaClient;
+
+    await expect(
+      resolveSecurityContext(prisma, {
+        userId: mockUser.id,
+        targetTenantId: 'org-suvarna-mumbai',
+      })
     ).rejects.toThrow(AuthorizationError);
 
     await expect(
       resolveSecurityContext(prisma, {
         userId: mockUser.id,
         targetTenantId: 'org-suvarna-mumbai',
-        targetBranchId: 'branch-vashi',
       })
-    ).rejects.toThrow(/You do not have access to branch 'branch-vashi'/);
+    ).rejects.toThrow(/You are not an active member of business 'org-suvarna-mumbai'/);
   });
 
   it('resolves valid security context with verified claims from database', async () => {

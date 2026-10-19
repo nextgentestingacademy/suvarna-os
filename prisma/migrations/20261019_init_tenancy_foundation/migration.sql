@@ -124,6 +124,7 @@ CREATE TABLE "branches" (
 -- CreateTable: membership_branch_access
 CREATE TABLE "membership_branch_access" (
     "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
     "memberId" TEXT NOT NULL,
     "branchId" TEXT NOT NULL,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
@@ -154,6 +155,7 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "sessions_token_key" ON "sessions"("token");
 CREATE UNIQUE INDEX "organizations_slug_key" ON "organizations"("slug");
 CREATE UNIQUE INDEX "members_organizationId_userId_key" ON "members"("organizationId", "userId");
+CREATE UNIQUE INDEX "members_organizationId_id_key" ON "members"("organizationId", "id");
 CREATE UNIQUE INDEX "branches_organizationId_code_key" ON "branches"("organizationId", "code");
 CREATE UNIQUE INDEX "branches_organizationId_id_key" ON "branches"("organizationId", "id");
 CREATE UNIQUE INDEX "membership_branch_access_memberId_branchId_key" ON "membership_branch_access"("memberId", "branchId");
@@ -170,8 +172,12 @@ ALTER TABLE "members" ADD CONSTRAINT "members_userId_fkey" FOREIGN KEY ("userId"
 ALTER TABLE "invitations" ADD CONSTRAINT "invitations_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "invitations" ADD CONSTRAINT "invitations_inviterId_fkey" FOREIGN KEY ("inviterId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "branches" ADD CONSTRAINT "branches_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "membership_branch_access" ADD CONSTRAINT "membership_branch_access_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "membership_branch_access" ADD CONSTRAINT "membership_branch_access_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "branches"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Enforced Composite Foreign Keys (Cross-Tenant Integrity)
+ALTER TABLE "membership_branch_access" ADD CONSTRAINT "membership_branch_access_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "membership_branch_access" ADD CONSTRAINT "membership_branch_access_organizationId_memberId_fkey" FOREIGN KEY ("organizationId", "memberId") REFERENCES "members"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "membership_branch_access" ADD CONSTRAINT "membership_branch_access_organizationId_branchId_fkey" FOREIGN KEY ("organizationId", "branchId") REFERENCES "branches"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "branches"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
