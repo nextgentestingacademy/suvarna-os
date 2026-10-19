@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --color-suvarna-plum: #542047;
+  --color-suvarna-plum-dark: #421b48;
+  --color-suvarna-plum-light: #7b285e;
+  --color-suvarna-gold: #d49a24;
+  --color-suvarna-gold-light: #ffe8a8;
+  --color-suvarna-gold-muted: #f4ead5;
+  --color-suvarna-cream: #fff8f1;
+  --color-suvarna-ink: #25203a;
+  --color-suvarna-muted: #68647a;
+  --color-suvarna-border: #eee2dc;
+}
+
 @layer base {
   :root {
     --suvarna-plum: #542047;
@@ -12,8 +25,8 @@
   }
 
   body {
-    background-color: var(--suvarna-cream);
-    color: var(--suvarna-ink);
+    background-color: #fff8f1;
+    color: #25203a;
     font-family: Inter, system-ui, -apple-system, sans-serif;
   }
 }
