@@ -2,7 +2,7 @@
 
 import React, { useState, createContext, useContext } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Gem,
@@ -19,12 +19,23 @@ import {
   X,
   Bell,
   HelpCircle,
+  LogOut,
 } from 'lucide-react';
 import { DEMO_BRANCHES, DEMO_RATES, DemoBranch } from '@/data/mock-workspace';
+import { authClient } from '@/lib/auth-client';
+
+export interface WorkspaceUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  tenantSlug: string;
+}
 
 interface WorkspaceContextType {
   activeBranch: DemoBranch;
   setActiveBranch: (branch: DemoBranch) => void;
+  user?: WorkspaceUser;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType>({
@@ -34,16 +45,54 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
 
 export const useWorkspace = () => useContext(WorkspaceContext);
 
-export function WorkspaceShell({ children }: { children: React.ReactNode }) {
+export function WorkspaceShell({
+  children,
+  user,
+}: {
+  children: React.ReactNode;
+  user?: WorkspaceUser;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const [activeBranch, setActiveBranch] = useState<DemoBranch>(DEMO_BRANCHES[0]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    showToast('Signing out of showroom session...');
+    try {
+      await authClient.signOut();
+      router.push('/login');
+      router.refresh();
+    } catch {
+      router.push('/login');
+    }
+  };
+
+  const formatRole = (role?: string) => {
+    switch (role) {
+      case 'OWNER': return 'Store Owner';
+      case 'MANAGER': return 'Store Manager';
+      case 'ACCOUNTANT': return 'Chartered Accountant';
+      case 'SALES_STAFF': return 'Sales Staff';
+      default: return role || 'Staff Member';
+    }
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'AM';
+    const parts = name.split(' ').filter(Boolean);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
   };
 
   const navItems = [
@@ -173,18 +222,35 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
               <HelpCircle className="w-4 h-4" />
             </button>
 
-            <Link
-              href="/login"
-              className="flex items-center gap-2 pl-2 border-l border-[#eee2dc] hover:opacity-85 transition"
-            >
-              <div className="w-8 h-8 rounded-full bg-[#f4ead5] text-[#542047] border border-[#d49a24]/40 flex items-center justify-center font-bold text-xs">
-                AM
+            {/* Authenticated User Display + Sign Out Button */}
+            <div className="flex items-center gap-2 pl-2 border-l border-[#eee2dc]">
+              <div
+                className="w-8 h-8 rounded-full bg-[#f4ead5] text-[#542047] border border-[#d49a24]/40 flex items-center justify-center font-bold text-xs shrink-0"
+                title={user?.email || 'Authenticated User'}
+              >
+                {getInitials(user?.name)}
               </div>
               <div className="hidden md:block text-left">
-                <span className="text-xs font-bold text-[#542047] block leading-tight">Anil Mehta</span>
-                <span className="text-[10px] text-[#68647a] block leading-none">Store Owner</span>
+                <span className="text-xs font-bold text-[#542047] block leading-tight truncate max-w-[130px]">
+                  {user?.name || 'Anil Mehta'}
+                </span>
+                <span className="text-[10px] text-[#68647a] block leading-none">
+                  {formatRole(user?.role)}
+                </span>
               </div>
-            </Link>
+              <button
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="ml-1 p-2 rounded-xl text-[#68647a] hover:text-[#b93657] hover:bg-[#fff0dc] transition flex items-center gap-1.5 text-xs cursor-pointer disabled:opacity-50"
+                title="Sign Out"
+                aria-label="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden xl:inline text-[11px] font-semibold">
+                  {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                </span>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -244,6 +310,16 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                   <span className="text-[#246743] font-bold">● ONLINE</span>
                 </div>
               </div>
+
+              {/* Sidebar Sign Out Button */}
+              <button
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="w-full mt-2 py-2 px-3 bg-white hover:bg-[#fff0dc] border border-[#eee2dc] hover:border-[#d49a24] rounded-xl text-xs font-semibold text-[#68647a] hover:text-[#542047] transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <LogOut className="w-3.5 h-3.5 text-[#b93657]" />
+                <span>{isSigningOut ? 'Signing out...' : 'Sign Out of Showroom'}</span>
+              </button>
             </div>
           </aside>
 

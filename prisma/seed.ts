@@ -112,7 +112,7 @@ async function main() {
     // Create Better Auth credential account
     await prisma.account.create({
       data: {
-        accountId: user.email,
+        accountId: user.id,
         providerId: 'credential',
         userId: user.id,
         password: devPasswordHash,
@@ -174,7 +174,7 @@ async function main() {
 
   await prisma.account.create({
     data: {
-      accountId: otherUser.email,
+      accountId: otherUser.id,
       providerId: 'credential',
       userId: otherUser.id,
       password: devPasswordHash,
