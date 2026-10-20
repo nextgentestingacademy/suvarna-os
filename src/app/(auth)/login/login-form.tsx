@@ -225,32 +225,34 @@ export function LoginForm({ returnTo, errorParam }: LoginFormProps) {
             </button>
           </form>
 
-          {/* Development Fictional Accounts Helper (Fills Email only, requires real password) */}
-          <div className="mt-6 pt-5 border-t border-[#eee2dc]">
-            <div className="flex items-center gap-1.5 mb-2 justify-center">
-              <KeyRound className="w-3.5 h-3.5 text-[#d49a24]" />
-              <span className="text-[10px] font-bold text-[#68647a] uppercase tracking-wider">
-                Development Test Personas
-              </span>
+          {/* Development Fictional Accounts Helper (Fills Email only, requires real password) - Omitted in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-6 pt-5 border-t border-[#eee2dc]">
+              <div className="flex items-center gap-1.5 mb-2 justify-center">
+                <KeyRound className="w-3.5 h-3.5 text-[#d49a24]" />
+                <span className="text-[10px] font-bold text-[#68647a] uppercase tracking-wider">
+                  Development Test Personas
+                </span>
+              </div>
+              <p className="text-[10px] text-[#68647a] text-center mb-2.5">
+                Click to populate email address (requires development password):
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {SEEDED_PERSONAS.map((p) => (
+                  <button
+                    key={p.role}
+                    type="button"
+                    onClick={() => handleFillEmail(p.email)}
+                    disabled={isLoading}
+                    className="p-2 bg-[#fffaf5] hover:bg-[#fff0dc] border border-[#eee2dc] rounded-xl text-left transition disabled:opacity-50 cursor-pointer"
+                  >
+                    <span className="font-bold text-[#542047] block text-[11px]">{p.role}</span>
+                    <span className="text-[10px] text-[#68647a] block truncate">{p.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-[10px] text-[#68647a] text-center mb-2.5">
-              Click to populate email address (requires development password):
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {SEEDED_PERSONAS.map((p) => (
-                <button
-                  key={p.role}
-                  type="button"
-                  onClick={() => handleFillEmail(p.email)}
-                  disabled={isLoading}
-                  className="p-2 bg-[#fffaf5] hover:bg-[#fff0dc] border border-[#eee2dc] rounded-xl text-left transition disabled:opacity-50 cursor-pointer"
-                >
-                  <span className="font-bold text-[#542047] block text-[11px]">{p.role}</span>
-                  <span className="text-[10px] text-[#68647a] block truncate">{p.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Return to Public Hub */}
           <div className="mt-6 text-center">

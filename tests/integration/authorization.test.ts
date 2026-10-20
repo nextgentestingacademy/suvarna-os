@@ -356,4 +356,159 @@ describe('Checkpoint 2B.3 — Live Database-Backed Business & Branch Authorizati
     expect(fortCtx.activeBranchId).toBe(fortBranch.id);
     expect(fortCtx.activeBranch?.code).toBe('FORT');
   });
+
+  // ============================================================================
+  // 12. Cross-Business Data Mutations Are Blocked by Mandatory Tenant Scoping
+  // ============================================================================
+  it('12. cross-business update and delete queries affect 0 records under tenant scoping', async () => {
+    // Attempt to update Kalyan's branch using Suvarna's tenant ID
+    const updateResult = await prisma.branch.updateMany({
+      where: {
+        id: thaneBranch.id,
+        organizationId: suvarnaOrg.id, // Strictly scoped to Suvarna
+      },
+      data: {
+        name: 'Hacked Showroom Name',
+      },
+    });
+    expect(updateResult.count).toBe(0);
+
+    // Verify Kalyan branch is completely unchanged
+    const verifyBranch = await prisma.branch.findUniqueOrThrow({
+      where: { id: thaneBranch.id },
+    });
+    expect(verifyBranch.name).toBe('Thane Store');
+
+    // Attempt to delete Kalyan's branch using Suvarna's tenant ID
+    const deleteResult = await prisma.branch.deleteMany({
+      where: {
+        id: thaneBranch.id,
+        organizationId: suvarnaOrg.id,
+      },
+    });
+    expect(deleteResult.count).toBe(0);
+  });
+
+  // ============================================================================
+  // 13. Stale or Tampered Active-Branch Cookie Safely Falls Back to Permitted Branch
+  // ============================================================================
+  it('13. tampered or unauthorized active-branch cookie safely falls back without privilege escalation', async () => {
+    // Create session headers with a tampered cookie pointing to Kalyan's Thane branch
+    const managerHeaders = await getSessionHeaders('manager@suvarna.test');
+    const existingCookie = managerHeaders.get('cookie') || '';
+    const tamperedHeaders = new Headers({
+      cookie: `${existingCookie}; suvarna_active_branch_id=${thaneBranch.id}`,
+    });
+
+    // getServerSecurityContext must detect that thaneBranch is unauthorized for manager
+    // and safely fall back to the manager's authorized branch (FORT) rather than granting access
+    const safeCtx = await getServerSecurityContext({ headers: tamperedHeaders });
+    expect(safeCtx.activeBranchId).toBe(fortBranch.id);
+    expect(safeCtx.allowedBranchIds).not.toContain(thaneBranch.id);
+  });
+
+  // ============================================================================
+  // 14. Non-Existent or Forged Identifiers During Switching Are Safely Denied
+  // ============================================================================
+  it('14. switching with non-existent or forged UUIDs is safely denied without crashing', async () => {
+    const ownerHeaders = await getSessionHeaders('owner@suvarna.test');
+    const FAKE_UUID = '00000000-0000-0000-0000-000000000000';
+
+    // Tampered org switch
+    const orgSwitchRes = await switchActiveOrganizationAction(FAKE_UUID, { headers: ownerHeaders });
+    expect(orgSwitchRes.success).toBe(false);
+    expect(orgSwitchRes.error).toMatch(/Access denied/);
+
+    // Tampered branch switch
+    const branchSwitchRes = await switchActiveBranchAction(FAKE_UUID, { headers: ownerHeaders });
+    expect(branchSwitchRes.success).toBe(false);
+    expect(branchSwitchRes.error).toMatch(/Access denied/);
+  });
+
+  // ============================================================================
+  // 15. Nested-Record Queries Strictly segregate Data by Tenant
+  // ============================================================================
+  it('15. nested entity queries preserve strict multi-tenant boundary integrity', async () => {
+    const suvarnaDetails = await prisma.organization.findUniqueOrThrow({
+      where: { id: suvarnaOrg.id },
+      include: {
+        branches: true,
+        members: {
+          include: {
+            branchAccess: {
+              include: {
+                branch: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Every branch must belong strictly to Suvarna
+    expect(suvarnaDetails.branches.every((b) => b.organizationId === suvarnaOrg.id)).toBe(true);
+    expect(suvarnaDetails.branches.some((b) => b.id === thaneBranch.id)).toBe(false);
+
+    // Every member branch-access link must belong strictly to Suvarna
+    for (const member of suvarnaDetails.members) {
+      expect(member.organizationId).toBe(suvarnaOrg.id);
+      for (const access of member.branchAccess) {
+        expect(access.organizationId).toBe(suvarnaOrg.id);
+        expect(access.branch.organizationId).toBe(suvarnaOrg.id);
+      }
+    }
+  });
+
+  // ============================================================================
+  // 16. Session Revocation / Deletion Immediately Invalidates Access
+  // ============================================================================
+  it('16. deleting or revoking active session in database immediately invalidates access', async () => {
+    // Acquire real session
+    const signInRes = await auth.api.signInEmail({
+      body: { email: 'sales@suvarna.test', password: DEV_PASSWORD },
+      asResponse: true,
+    });
+    const cookie = signInRes.headers.get('set-cookie')!;
+    const sessionHeaders = new Headers({ cookie });
+
+    // Verify session is active
+    const activeCtx = await getServerSecurityContext({ headers: sessionHeaders });
+    expect(activeCtx.userEmail).toBe('sales@suvarna.test');
+
+    // Revoke all sessions for this sales user directly in the database
+    await prisma.session.deleteMany({
+      where: { userId: salesUser.id },
+    });
+
+    // Subsequent access with the revoked session cookie must immediately be rejected
+    await expect(
+      getServerSecurityContext({ headers: sessionHeaders })
+    ).rejects.toThrow(/Authentication required/);
+  });
+
+  // ============================================================================
+  // 17. Composite Foreign Key on (organizationId, memberId) Enforces Tenant Boundary
+  // ============================================================================
+  it('17. composite foreign key (organizationId, memberId) rejects cross-tenant member link', async () => {
+    const suvarnaMember = await prisma.member.findFirstOrThrow({
+      where: { organizationId: suvarnaOrg.id, userId: ownerUser.id },
+    });
+
+    // Try to link Suvarna's member to Kalyan's organization (mismatch on composite FK)
+    let caughtFkError = false;
+    try {
+      await prisma.membershipBranchAccess.create({
+        data: {
+          organizationId: kalyanOrg.id,
+          memberId: suvarnaMember.id, // Suvarna member with Kalyan org ID!
+          branchId: thaneBranch.id,
+        },
+      });
+    } catch (err: any) {
+      caughtFkError = true;
+      expect(err.code).toBe('P2003');
+    }
+    expect(caughtFkError).toBe(true);
+  });
 });
+

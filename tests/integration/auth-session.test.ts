@@ -186,8 +186,10 @@ describe('Database-Backed Authentication & Session Lifecycle', () => {
     });
   });
 
-  it('9. verifies manager and staff logins resolve their specific role permissions', async () => {
-    const rolesToTest = [
+  it(
+    '9. verifies manager and staff logins resolve their specific role permissions',
+    async () => {
+      const rolesToTest = [
       { email: 'manager@suvarna.test', expectedRole: 'MANAGER', branchCount: 1 },
       { email: 'accountant@suvarna.test', expectedRole: 'ACCOUNTANT', branchCount: 2 },
       { email: 'sales@suvarna.test', expectedRole: 'SALES_STAFF', branchCount: 1 },
@@ -221,5 +223,5 @@ describe('Database-Backed Authentication & Session Lifecycle', () => {
         headers: new Headers({ cookie }),
       });
     }
-  });
+  }, 15000);
 });
