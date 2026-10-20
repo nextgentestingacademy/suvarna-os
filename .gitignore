@@ -50,3 +50,6 @@ lerna-debug.log*
 # TypeScript cache
 *.tsbuildinfo
 next-env.d.ts
+
+# Local credential notes
+details.txt
