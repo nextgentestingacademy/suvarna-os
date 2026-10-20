@@ -110,6 +110,7 @@ export function LoginForm({ returnTo, errorParam }: LoginFormProps) {
       }, 400);
 
     } catch (err: unknown) {
+      console.error('Sign in error:', err);
       setIsLoading(false);
       setStatusMessage(null);
       setAuthError('Authentication service temporarily unavailable. Please try again.');
