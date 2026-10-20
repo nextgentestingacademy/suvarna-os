@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { DEMO_BRANCHES, DEMO_RATES, DemoBranch } from '@/data/mock-workspace';
 import { authClient } from '@/lib/auth-client';
+import { switchActiveBranchAction } from '@/app/actions/workspace';
 
 export interface WorkspaceUser {
   id: string;
@@ -30,6 +31,18 @@ export interface WorkspaceUser {
   email: string;
   role: string;
   tenantSlug: string;
+  tenantName?: string;
+}
+
+export interface WorkspaceBranch {
+  id: string;
+  name: string;
+  code: string;
+  city: string;
+  address?: string;
+  addressLine1?: string | null;
+  isMain?: boolean;
+  isMainBranch?: boolean;
 }
 
 interface WorkspaceContextType {
@@ -48,21 +61,65 @@ export const useWorkspace = () => useContext(WorkspaceContext);
 export function WorkspaceShell({
   children,
   user,
+  permittedBranches,
+  initialActiveBranchId,
 }: {
   children: React.ReactNode;
   user?: WorkspaceUser;
+  permittedBranches?: readonly WorkspaceBranch[];
+  initialActiveBranchId?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [activeBranch, setActiveBranch] = useState<DemoBranch>(DEMO_BRANCHES[0]);
+
+  // Normalize available branches from verified database permissions or fallback to demo
+  const branchesList: DemoBranch[] = (permittedBranches && permittedBranches.length > 0)
+    ? permittedBranches.map((b) => ({
+        id: b.id,
+        name: b.name,
+        code: b.code,
+        city: b.city,
+        address: b.addressLine1 || b.address || 'Showroom Address',
+        isMain: b.isMainBranch ?? b.isMain ?? false,
+      }))
+    : DEMO_BRANCHES;
+
+  const defaultBranch = branchesList.find((b) => b.id === initialActiveBranchId) || branchesList[0];
+  const [activeBranch, setActiveBranch] = useState<DemoBranch>(defaultBranch);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleBranchSwitch = async (b: DemoBranch) => {
+    if (b.id === activeBranch.id) {
+      setIsBranchDropdownOpen(false);
+      return;
+    }
+
+    setIsSwitchingBranch(true);
+    showToast(`Switching active showroom to ${b.name}...`);
+    try {
+      const res = await switchActiveBranchAction(b.id);
+      if (res.success) {
+        setActiveBranch(b);
+        setIsBranchDropdownOpen(false);
+        showToast(`Active showroom switched to ${b.name}`);
+        router.refresh();
+      } else {
+        showToast(res.error || 'Failed to switch active showroom');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Error switching active showroom');
+    } finally {
+      setIsSwitchingBranch(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -148,7 +205,7 @@ export function WorkspaceShell({
                   SUVARNA
                 </span>
                 <span className="text-[9px] tracking-widest text-[#68647a] block uppercase font-medium">
-                  Jewellery Business OS
+                  {user?.tenantName || 'Jewellery Business OS'}
                 </span>
               </div>
             </Link>
@@ -158,7 +215,8 @@ export function WorkspaceShell({
           <div className="relative">
             <button
               onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-[#fffaf5] border border-[#eee2dc] hover:border-[#d49a24] rounded-xl text-xs font-medium text-[#542047] transition shadow-xs"
+              disabled={isSwitchingBranch}
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#fffaf5] border border-[#eee2dc] hover:border-[#d49a24] rounded-xl text-xs font-medium text-[#542047] transition shadow-xs disabled:opacity-50 cursor-pointer"
             >
               <Store className="w-3.5 h-3.5 text-[#d49a24]" />
               <div className="text-left hidden sm:block">
@@ -173,18 +231,16 @@ export function WorkspaceShell({
 
             {isBranchDropdownOpen && (
               <div className="absolute right-0 mt-1.5 w-64 bg-white border border-[#eee2dc] rounded-xl shadow-xl z-50 p-1.5 animate-in fade-in slide-in-from-top-1">
-                <div className="px-3 py-2 text-[10px] font-bold text-[#68647a] uppercase tracking-wider border-b border-[#eee2dc]">
-                  Switch Showroom Location
+                <div className="px-3 py-2 text-[10px] font-bold text-[#68647a] uppercase tracking-wider border-b border-[#eee2dc] flex items-center justify-between">
+                  <span>Switch Showroom</span>
+                  <span className="text-[9px] text-[#d49a24] font-semibold">{branchesList.length} permitted</span>
                 </div>
-                {DEMO_BRANCHES.map((b) => (
+                {branchesList.map((b) => (
                   <button
                     key={b.id}
-                    onClick={() => {
-                      setActiveBranch(b);
-                      setIsBranchDropdownOpen(false);
-                      showToast(`Switched active showroom to ${b.name}`);
-                    }}
-                    className={`w-full text-left p-2.5 rounded-lg text-xs transition flex flex-col gap-0.5 ${
+                    onClick={() => handleBranchSwitch(b)}
+                    disabled={isSwitchingBranch}
+                    className={`w-full text-left p-2.5 rounded-lg text-xs transition flex flex-col gap-0.5 cursor-pointer ${
                       activeBranch.id === b.id
                         ? 'bg-[#fff0dc] text-[#542047] font-bold border-l-4 border-[#d49a24]'
                         : 'hover:bg-[#fffaf5] text-[#25203a]'

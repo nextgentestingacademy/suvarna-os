@@ -1,10 +1,20 @@
 import { PrismaClient } from '@prisma/client';
-import { SecurityContext, Role, AuthorizationError } from '@/types/security';
+import { SecurityContext, Role, Permission, BranchInfo, AuthorizationError } from '@/types/security';
+import { prisma as defaultPrisma } from '@/lib/db';
+import { auth } from '@/lib/auth';
+import { assertPermission, assertBranchAccess } from '@/lib/rbac';
 
 export interface ResolveContextParams {
   userId: string;
   targetTenantId?: string;
   targetBranchId?: string;
+}
+
+export interface GetServerSecurityContextOptions {
+  targetTenantId?: string;
+  targetBranchId?: string;
+  requiredPermission?: Permission;
+  headers?: Headers;
 }
 
 /**
@@ -24,14 +34,14 @@ export async function resolveSecurityContext(
   // 1. Fetch user to verify active account
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true },
+    select: { id: true, email: true, name: true },
   });
 
   if (!user) {
     throw new AuthorizationError('User account not found.', 'USER_NOT_FOUND');
   }
 
-  // 2. Fetch membership: either for the specific targetTenantId, or the user's primary/active membership
+  // 2. Fetch active membership: either for the specific targetTenantId, or the user's primary/active membership
   const member = await prisma.member.findFirst({
     where: {
       userId: user.id,
@@ -57,10 +67,22 @@ export async function resolveSecurityContext(
     );
   }
 
-  // 3. Extract permitted branch IDs
-  const allowedBranchIds = member.branchAccess.map((b) => b.branchId);
 
-  // 4. Validate active branch selection if provided
+  // 4. Extract permitted branch records and IDs
+  const permittedBranches: BranchInfo[] = member.branchAccess
+    .filter((ba) => ba.branch.isActive !== false)
+    .map((ba) => ({
+      id: ba.branch.id,
+      name: ba.branch.name,
+      code: ba.branch.code,
+      city: ba.branch.city ?? '',
+      addressLine1: ba.branch.addressLine1 ?? null,
+      isMainBranch: ba.branch.isMainBranch ?? false,
+    }));
+
+  const allowedBranchIds = permittedBranches.map((b) => b.id);
+
+  // 5. Validate active branch selection if provided
   let activeBranchId: string | undefined;
   if (targetBranchId) {
     if (!allowedBranchIds.includes(targetBranchId)) {
@@ -72,18 +94,90 @@ export async function resolveSecurityContext(
     activeBranchId = targetBranchId;
   } else {
     // Default to the branch flagged as default, or the first allowed branch
-    const defaultBranch = member.branchAccess.find((b) => b.isDefault);
-    activeBranchId = defaultBranch?.branchId ?? allowedBranchIds[0];
+    const defaultBranchAccess = member.branchAccess.find(
+      (b) => b.isDefault && allowedBranchIds.includes(b.branchId)
+    );
+    activeBranchId = defaultBranchAccess?.branchId ?? allowedBranchIds[0];
   }
+
+  const activeBranch = permittedBranches.find((b) => b.id === activeBranchId);
 
   return {
     userId: user.id,
+    userName: user.name ?? undefined,
     userEmail: user.email,
     tenantId: member.organizationId,
+    tenantName: member.organization.name,
     tenantSlug: member.organization.slug,
     membershipId: member.id,
     role: member.role as Role,
     activeBranchId,
+    activeBranch,
     allowedBranchIds,
+    permittedBranches,
   };
 }
+
+/**
+ * Resolves verified SecurityContext from authenticated Better Auth server session.
+ * Enforces role permissions and branch access when requested.
+ */
+export async function getServerSecurityContext(
+  options?: GetServerSecurityContextOptions
+): Promise<SecurityContext> {
+  let reqHeaders = options?.headers;
+  let activeBranchCookie: string | undefined;
+
+  if (!reqHeaders) {
+    try {
+      const { headers: getHeaders, cookies: getCookies } = await import('next/headers');
+      reqHeaders = await getHeaders();
+      const cookieStore = await getCookies();
+      activeBranchCookie = cookieStore.get('suvarna_active_branch_id')?.value;
+    } catch {
+      reqHeaders = new Headers();
+    }
+  }
+
+  const session = await auth.api.getSession({
+    headers: reqHeaders,
+  });
+
+  if (!session?.user) {
+    throw new AuthorizationError('Authentication required: No active session.', 'UNAUTHENTICATED');
+  }
+
+  const targetTenantId = options?.targetTenantId || session.session.activeOrganizationId || undefined;
+  const targetBranchId = options?.targetBranchId || activeBranchCookie || undefined;
+
+  let ctx: SecurityContext;
+  try {
+    ctx = await resolveSecurityContext(defaultPrisma, {
+      userId: session.user.id,
+      targetTenantId,
+      targetBranchId,
+    });
+  } catch (err: any) {
+    // If targetBranchId came from cookie and failed, fallback to default branch for this user
+    if (activeBranchCookie && !options?.targetBranchId && err.code === 'UNAUTHORIZED_BRANCH') {
+      ctx = await resolveSecurityContext(defaultPrisma, {
+        userId: session.user.id,
+        targetTenantId,
+        targetBranchId: undefined,
+      });
+    } else {
+      throw err;
+    }
+  }
+
+  if (options?.requiredPermission) {
+    assertPermission(ctx, options.requiredPermission);
+  }
+
+  if (options?.targetBranchId) {
+    assertBranchAccess(ctx, options.targetBranchId);
+  }
+
+  return ctx;
+}
+

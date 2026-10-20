@@ -12,15 +12,28 @@ export type Permission =
   | 'ACCOUNTS_VIEW'         // View financial ledgers, expenses, sales analytics
   | 'AUDIT_VIEW';           // Inspect compliance audit logs
 
+export interface BranchInfo {
+  readonly id: string;
+  readonly name: string;
+  readonly code: string;
+  readonly city: string;
+  readonly addressLine1?: string | null;
+  readonly isMainBranch: boolean;
+}
+
 export interface SecurityContext {
   readonly userId: string;
+  readonly userName?: string;
   readonly userEmail: string;
   readonly tenantId: string;
+  readonly tenantName?: string;
   readonly tenantSlug: string;
   readonly membershipId: string;
   readonly role: Role;
   readonly activeBranchId?: string;
+  readonly activeBranch?: BranchInfo;
   readonly allowedBranchIds: readonly string[];
+  readonly permittedBranches?: readonly BranchInfo[];
 }
 
 export class AuthorizationError extends Error {
@@ -29,3 +42,4 @@ export class AuthorizationError extends Error {
     this.name = 'AuthorizationError';
   }
 }
+
