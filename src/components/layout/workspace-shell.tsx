@@ -24,6 +24,7 @@ import {
 import { DEMO_BRANCHES, DEMO_RATES, DemoBranch } from '@/data/mock-workspace';
 import { authClient } from '@/lib/auth-client';
 import { switchActiveBranchAction } from '@/app/actions/workspace';
+import { getPermittedNavItems } from '@/lib/navigation';
 
 export interface WorkspaceUser {
   id: string;
@@ -49,11 +50,13 @@ interface WorkspaceContextType {
   activeBranch: DemoBranch;
   setActiveBranch: (branch: DemoBranch) => void;
   user?: WorkspaceUser;
+  availableBranches?: DemoBranch[];
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType>({
   activeBranch: DEMO_BRANCHES[0],
   setActiveBranch: () => {},
+  availableBranches: DEMO_BRANCHES,
 });
 
 export const useWorkspace = () => useContext(WorkspaceContext);
@@ -152,20 +155,10 @@ export function WorkspaceShell({
     return name.slice(0, 2).toUpperCase();
   };
 
-  const navItems = [
-    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, ready: true },
-    { label: 'Jewellery Inventory', href: '/inventory', icon: Gem, ready: true },
-    { label: 'Customers & CRM', href: '/customers', icon: Users, ready: true },
-    { label: 'Billing & POS', href: '/billing', icon: Receipt, ready: false },
-    { label: 'Gold Purchase & Exchange', href: '/purchases', icon: Repeat, ready: false },
-    { label: 'Gold SIP Schemes', href: '/schemes', icon: PiggyBank, ready: false },
-    { label: 'Sales & Reports', href: '/reports', icon: BarChart3, ready: false },
-    { label: 'AI Sales Co-Pilot', href: '/ai-copilot', icon: Sparkles, ready: false },
-    { label: 'Branches & Settings', href: '/settings', icon: Settings, ready: false },
-  ];
+  const navItems = getPermittedNavItems(user?.role);
 
   return (
-    <WorkspaceContext.Provider value={{ activeBranch, setActiveBranch }}>
+    <WorkspaceContext.Provider value={{ activeBranch, setActiveBranch, user, availableBranches: branchesList }}>
       <div className="min-h-screen flex flex-col bg-[#fff8f1] text-[#25203a]">
         {/* Top Demo Notice Ribbon */}
         <aside aria-label="Demo mode notice" className="bg-[#421b48] text-white px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-inner">

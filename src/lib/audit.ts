@@ -44,7 +44,7 @@ export function sanitizeAuditData(data: unknown): unknown {
 
 export interface RecordAuditParams {
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'ACCESS_DENIED' | 'LOGIN' | 'LOGOUT';
-  entityType: 'Branch' | 'Member' | 'Organization' | 'User';
+  entityType: 'Branch' | 'Member' | 'Organization' | 'User' | 'Product' | 'Ornament' | 'StockMovement';
   entityId: string;
   changedFields?: Record<string, unknown>;
   ipAddress?: string;
@@ -55,7 +55,7 @@ export interface RecordAuditParams {
  * Records a privacy-safe audit trail entry.
  */
 export async function recordAuditLog(
-  prisma: PrismaClient,
+  prismaClient: any,
   ctx: SecurityContext,
   params: RecordAuditParams
 ) {
@@ -63,7 +63,7 @@ export async function recordAuditLog(
     ? (sanitizeAuditData(params.changedFields) as object)
     : undefined;
 
-  return prisma.auditLog.create({
+  return prismaClient.auditLog.create({
     data: {
       organizationId: ctx.tenantId,
       branchId: ctx.activeBranchId,

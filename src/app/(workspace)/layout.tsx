@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { getServerSecurityContext } from '@/lib/security-context';
 import { WorkspaceShell } from '@/components/layout/workspace-shell';
 
+export const dynamic = 'force-dynamic';
+
 export default async function WorkspaceLayout({
   children,
 }: {

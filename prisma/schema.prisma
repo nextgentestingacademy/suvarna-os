@@ -25,6 +25,7 @@ model User {
   members       Member[]
   invitations   Invitation[]
   auditLogs     AuditLog[]
+  stockMovements StockMovement[]
 
   @@map("users")
 }
@@ -90,6 +91,9 @@ model Organization {
   branches     Branch[]
   branchAccess MembershipBranchAccess[]
   auditLogs    AuditLog[]
+  products     Product[]
+  ornaments    Ornament[]
+  stockMovements StockMovement[]
 
   // Jewellery Business Domain Extensions
   legalName   String?
@@ -152,6 +156,9 @@ model Branch {
   updatedAt      DateTime                 @updatedAt
   branchAccess   MembershipBranchAccess[]
   auditLogs      AuditLog[]
+  ornaments      Ornament[]
+  movementsFrom  StockMovement[]          @relation("MovementsFrom")
+  movementsTo    StockMovement[]          @relation("MovementsTo")
 
   @@unique([organizationId, code])
   @@unique([organizationId, id]) // Composite key for cross-tenant database constraint
@@ -197,3 +204,93 @@ model AuditLog {
   @@index([organizationId, entityType, entityId])
   @@map("audit_logs")
 }
+
+// ==============================================================================
+// JEWELLERY PRODUCT CATALOGUE (Design Definitions)
+// ==============================================================================
+
+model Product {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sku            String       // Unique design code within business (e.g. "NK-22018")
+  name           String       // e.g. "Heritage Royal Kundan Choker"
+  category       String       // "Necklaces", "Bangles", "Earrings", "Bridal", "Chains", "Pendants", "Rings"
+  metalType      String       @default("GOLD") // "GOLD", "SILVER", "PLATINUM"
+  purity         String       @default("22K")  // "24K", "22K", "18K", "14K"
+  description    String?
+  imageUrl       String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  ornaments      Ornament[]
+
+  @@unique([organizationId, sku])
+  @@unique([organizationId, id]) // Composite key for cross-tenant FK verification
+  @@index([organizationId, category])
+  @@index([organizationId, isActive])
+  @@map("products")
+}
+
+// ==============================================================================
+// PHYSICAL ORNAMENTS & INVENTORY ITEMS
+// ==============================================================================
+
+model Ornament {
+  id                String          @id @default(uuid())
+  organizationId    String
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId          String
+  branch            Branch          @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Restrict)
+  productId         String
+  product           Product         @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  tagCode           String          // Unique barcode / tag identifier within business (e.g. "TAG-4001")
+  huid              String?         // 6-character alphanumeric BIS hallmark identifier
+  metalType         String          @default("GOLD")
+  purity            String          @default("22K")
+  grossWeight       Decimal         @db.Decimal(10, 3) // Grams to milligram precision (e.g. 48.500)
+  stoneWeight       Decimal         @default(0.000) @db.Decimal(10, 3) // Grams (e.g. 3.200)
+  netWeight         Decimal         @db.Decimal(10, 3) // Grams (e.g. 45.300) = gross - stone
+  makingChargeType  String?         // "PER_GRAM", "PERCENTAGE", "FIXED"
+  makingChargeValue Decimal?        @db.Decimal(12, 2)
+  costAmount        Decimal?        @db.Decimal(12, 2) // Wholesale / acquisition rate
+  priceAmount       Decimal?        @db.Decimal(12, 2) // Indicative showroom price
+  status            String          @default("AVAILABLE") // "AVAILABLE", "RESERVED", "SOLD"
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  movements         StockMovement[]
+
+  @@unique([organizationId, tagCode])
+  @@unique([organizationId, id]) // Composite key for cross-tenant FK verification
+  @@index([organizationId, branchId, status])
+  @@index([organizationId, productId])
+  @@index([organizationId, huid])
+  @@map("ornaments")
+}
+
+// ==============================================================================
+// STOCK MOVEMENTS & AUDIT LEDGER
+// ==============================================================================
+
+model StockMovement {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ornamentId     String
+  ornament       Ornament     @relation(fields: [organizationId, ornamentId], references: [organizationId, id], onDelete: Restrict)
+  fromBranchId   String?
+  fromBranch     Branch?      @relation("MovementsFrom", fields: [organizationId, fromBranchId], references: [organizationId, id], onDelete: Restrict)
+  toBranchId     String?
+  toBranch       Branch?      @relation("MovementsTo", fields: [organizationId, toBranchId], references: [organizationId, id], onDelete: Restrict)
+  movementType   String       // "INWARD", "TRANSFER", "RESERVATION", "CANCEL_RESERVATION", "SALE", "RETURN"
+  reason         String?      // Notes or reason for stock movement
+  metadata       Json?        // Structured adjustment payload { adjustmentType, before: {...}, after: {...} }
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, ornamentId, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("stock_movements")
+}
+

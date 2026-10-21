@@ -14,6 +14,7 @@ import {
   Package,
 } from 'lucide-react';
 import { useWorkspace } from '@/components/layout/workspace-shell';
+import { canManageInventory } from '@/lib/navigation';
 import {
   DEMO_RATES,
   INITIAL_DEMO_PRODUCTS,
@@ -22,7 +23,8 @@ import {
 } from '@/data/mock-workspace';
 
 export default function DashboardPage() {
-  const { activeBranch } = useWorkspace();
+  const { activeBranch, user } = useWorkspace();
+  const showAddJewellery = canManageInventory(user?.role);
 
   // Filter transactions and inventory relevant to active branch
   const branchTransactions = INITIAL_DEMO_TRANSACTIONS.filter(
@@ -55,13 +57,15 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Link
-            href="/inventory"
-            className="px-3.5 py-2 bg-[#542047] text-[#ffe8a8] hover:bg-[#421b48] rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Jewellery</span>
-          </Link>
+          {showAddJewellery && (
+            <Link
+              href="/inventory"
+              className="px-3.5 py-2 bg-[#542047] text-[#ffe8a8] hover:bg-[#421b48] rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Jewellery</span>
+            </Link>
+          )}
           <Link
             href="/customers"
             className="px-3.5 py-2 bg-white border border-[#eee2dc] hover:border-[#d49a24] text-[#542047] rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs"
