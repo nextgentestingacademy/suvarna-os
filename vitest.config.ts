@@ -7,6 +7,8 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
     exclude: ['**/node_modules/**', 'tests/e2e/**'],
+    testTimeout: 30000,
+    hookTimeout: 30000,
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

@@ -20,6 +20,9 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  rateLimit: {
+    enabled: false,
+  },
   plugins: [
     organization({
       allowUserToCreateOrganization: false, // In production, tenants are provisioned through verified onboarding

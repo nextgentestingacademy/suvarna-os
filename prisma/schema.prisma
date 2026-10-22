@@ -26,6 +26,7 @@ model User {
   invitations   Invitation[]
   auditLogs     AuditLog[]
   stockMovements StockMovement[]
+  customerInteractions CustomerInteraction[]
 
   @@map("users")
 }
@@ -94,6 +95,8 @@ model Organization {
   products     Product[]
   ornaments    Ornament[]
   stockMovements StockMovement[]
+  customers    Customer[]
+  customerInteractions CustomerInteraction[]
 
   // Jewellery Business Domain Extensions
   legalName   String?
@@ -157,6 +160,7 @@ model Branch {
   branchAccess   MembershipBranchAccess[]
   auditLogs      AuditLog[]
   ornaments      Ornament[]
+  customers      Customer[]
   movementsFrom  StockMovement[]          @relation("MovementsFrom")
   movementsTo    StockMovement[]          @relation("MovementsTo")
 
@@ -293,4 +297,64 @@ model StockMovement {
   @@index([organizationId, createdAt])
   @@map("stock_movements")
 }
+
+// ==============================================================================
+// CUSTOMER MANAGEMENT & RELATIONSHIPS (CRM)
+// ==============================================================================
+
+model Customer {
+  id              String                @id @default(uuid())
+  organizationId  String
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  primaryBranchId String?
+  primaryBranch   Branch?               @relation(fields: [organizationId, primaryBranchId], references: [organizationId, id], onDelete: Restrict)
+  customerCode    String?               // e.g. "CUST-1001", optional unique readable code within tenant
+  name            String                // Full legal or preferred customer name
+  phone           String                // Contact number as formatted
+  normalizedPhone String                // Normalized 10-digit number for search & duplicate detection
+  alternatePhone  String?
+  email           String?
+  addressLine1    String?
+  addressLine2    String?
+  city            String?
+  state           String?               @default("Maharashtra")
+  pincode         String?
+  pan             String?               // Indian Income Tax PAN (e.g. ABCDE1234F) for KYC >= 2 Lakhs
+  dateOfBirth     DateTime?
+  anniversary     DateTime?
+  segment         String                @default("RETAIL") // "RETAIL" | "VIP" | "BRIDAL" | "GOLD_SIP" | "REPEAT"
+  notes           String?               // Retail preferences, ring/bangle sizes, staff notes
+  preferences     Json?                 // Structured preferences: metalType, ringSize, etc.
+  isActive        Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  interactions    CustomerInteraction[]
+
+  @@unique([organizationId, id]) // Composite key for cross-tenant FK verification
+  @@index([organizationId, normalizedPhone])
+  @@index([organizationId, name])
+  @@index([organizationId, customerCode])
+  @@index([organizationId, primaryBranchId])
+  @@index([organizationId, isActive])
+  @@index([organizationId, createdAt])
+  @@map("customers")
+}
+
+model CustomerInteraction {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer     @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Cascade)
+  channel        String       @default("WALK_IN") // "WALK_IN" | "PHONE" | "WHATSAPP" | "FOLLOW_UP"
+  notes          String
+  followUpDate   DateTime?
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, customerId, createdAt])
+  @@map("customer_interactions")
+}
+
 

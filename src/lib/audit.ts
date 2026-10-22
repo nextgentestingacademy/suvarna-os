@@ -44,7 +44,7 @@ export function sanitizeAuditData(data: unknown): unknown {
 
 export interface RecordAuditParams {
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'ACCESS_DENIED' | 'LOGIN' | 'LOGOUT';
-  entityType: 'Branch' | 'Member' | 'Organization' | 'User' | 'Product' | 'Ornament' | 'StockMovement';
+  entityType: 'Branch' | 'Member' | 'Organization' | 'User' | 'Product' | 'Ornament' | 'StockMovement' | 'Customer' | 'CustomerInteraction';
   entityId: string;
   changedFields?: Record<string, unknown>;
   ipAddress?: string;

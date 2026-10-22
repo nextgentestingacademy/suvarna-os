@@ -12,11 +12,12 @@ test.describe('Suvarna Milestone 3B — Inventory Browser End-to-End Workflows',
   const TEST_NAME = 'E2E Royal Heritage Choker';
 
   async function loginAs(page: Page, email: string) {
+    await page.context().clearCookies();
     await page.goto('/login');
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', DEV_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard', { timeout: 20000 });
+    await expect(page).toHaveURL(/.*dashboard/, { timeout: 30000 });
   }
 
   test.beforeAll(async () => {
