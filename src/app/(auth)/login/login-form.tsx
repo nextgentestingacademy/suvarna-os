@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -50,6 +50,11 @@ export function LoginForm({ returnTo, errorParam }: LoginFormProps) {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const handleFillEmail = (personaEmail: string) => {
     setEmail(personaEmail);
@@ -166,7 +171,7 @@ export function LoginForm({ returnTo, errorParam }: LoginFormProps) {
             </div>
           )}
 
-          <form onSubmit={handleSignIn} className="space-y-4">
+          <form onSubmit={handleSignIn} action="#" data-hydrated={isHydrated} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-[#25203a] mb-1">
                 Work Email Address

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { JewelArt } from '@/components/jewel-art';
 import { SerializedOrnament, SerializedStockMovement, getOrnamentMovementsAction } from '@/app/actions/inventory';
+import { getIndicativePrice } from '@/lib/indicative-pricing';
 
 interface OrnamentDetailModalProps {
   ornament: SerializedOrnament | null;
@@ -98,7 +99,7 @@ export function OrnamentDetailModal({
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="font-mono text-xs font-bold text-[#d49a24] bg-[#fffaf0] border border-[#f1d394] px-2 py-0.5 rounded">
-                TAG: {ornament.tagCode}
+                Tag Code: {ornament.tagCode}
               </span>
               {ornament.huid && (
                 <span className="flex items-center gap-1 font-mono text-xs font-bold text-[#542047] bg-[#f9eef6] border border-[#d6a5c9] px-2 py-0.5 rounded">
@@ -114,7 +115,8 @@ export function OrnamentDetailModal({
               {ornament.product?.name || 'Jewellery Ornament'}
             </h2>
             <p className="text-xs text-[#68647a]">
-              SKU: <span className="font-mono font-medium">{ornament.product?.sku || '—'}</span> · Showroom:{' '}
+              <span className="font-semibold text-[#542047]">Product Code (SKU):</span>{' '}
+              <span className="font-mono font-medium text-[#25203a]">{ornament.product?.sku || '—'}</span> · Showroom:{' '}
               <span className="font-medium text-[#25203a]">{ornament.branch?.name || 'Main Branch'}</span>
             </p>
           </div>
@@ -155,8 +157,31 @@ export function OrnamentDetailModal({
           </div>
 
           <div className="p-3 bg-[#fffaf5] border border-[#eee2dc] rounded-xl">
-            <span className="text-[#68647a] block text-[10px] font-medium">Indicative Retail Price</span>
-            <span className="font-bold text-[#7b285e] text-sm">{formatCurrency(ornament.priceAmount)}</span>
+            {(() => {
+              const pricing = getIndicativePrice(ornament);
+              return (
+                <>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[#68647a] block text-[10px] font-medium">Indicative Retail Price</span>
+                    {pricing.hasPrice && (
+                      <span className="text-[9px] text-[#d49a24] bg-white px-1 rounded border border-[#f1d394]">
+                        {pricing.label}
+                      </span>
+                    )}
+                  </div>
+                  {pricing.hasPrice ? (
+                    <span className="font-bold text-[#7b285e] text-sm block">{pricing.formattedPrice}</span>
+                  ) : (
+                    <div>
+                      <span className="font-medium text-stone-500 text-xs block">{pricing.formattedPrice}</span>
+                      {pricing.reason && (
+                        <span className="text-[10px] text-stone-400 block font-normal">({pricing.reason})</span>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
           <div className="p-3 bg-[#fffaf5] border border-[#eee2dc] rounded-xl">
             <span className="text-[#68647a] block text-[10px] font-medium">Making Charge</span>

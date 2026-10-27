@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { SecurityContext, Role, Permission, BranchInfo, AuthorizationError } from '@/types/security';
-import { prisma as defaultPrisma } from '@/lib/db';
+import { prisma as defaultPrisma, withDbRetry } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import { assertPermission, assertBranchAccess } from '@/lib/rbac';
 
@@ -15,6 +15,7 @@ export interface GetServerSecurityContextOptions {
   targetBranchId?: string;
   requiredPermission?: Permission;
   headers?: Headers;
+  contextOverride?: SecurityContext;
 }
 
 /**
@@ -32,31 +33,35 @@ export async function resolveSecurityContext(
   }
 
   // 1. Fetch user to verify active account
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, name: true },
-  });
+  const user = await withDbRetry(() =>
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true },
+    })
+  );
 
   if (!user) {
     throw new AuthorizationError('User account not found.', 'USER_NOT_FOUND');
   }
 
   // 2. Fetch active membership: either for the specific targetTenantId, or the user's primary/active membership
-  const member = await prisma.member.findFirst({
-    where: {
-      userId: user.id,
-      ...(targetTenantId ? { organizationId: targetTenantId } : {}),
-      status: 'ACTIVE',
-    },
-    include: {
-      organization: true,
-      branchAccess: {
-        include: {
-          branch: true,
+  const member = await withDbRetry(() =>
+    prisma.member.findFirst({
+      where: {
+        userId: user.id,
+        ...(targetTenantId ? { organizationId: targetTenantId } : {}),
+        status: 'ACTIVE',
+      },
+      include: {
+        organization: true,
+        branchAccess: {
+          include: {
+            branch: true,
+          },
         },
       },
-    },
-  });
+    })
+  );
 
   if (!member) {
     throw new AuthorizationError(
@@ -125,6 +130,13 @@ export async function resolveSecurityContext(
 export async function getServerSecurityContext(
   options?: GetServerSecurityContextOptions
 ): Promise<SecurityContext> {
+  if (options?.contextOverride) {
+    if (options.requiredPermission) {
+      assertPermission(options.contextOverride, options.requiredPermission);
+    }
+    return options.contextOverride;
+  }
+
   let reqHeaders = options?.headers;
   let activeBranchCookie: string | undefined;
 
@@ -139,9 +151,11 @@ export async function getServerSecurityContext(
     }
   }
 
-  const session = await auth.api.getSession({
-    headers: reqHeaders,
-  });
+  const session = await withDbRetry(() =>
+    auth.api.getSession({
+      headers: reqHeaders,
+    })
+  );
 
   if (!session?.user) {
     throw new AuthorizationError('Authentication required: No active session.', 'UNAUTHENTICATED');

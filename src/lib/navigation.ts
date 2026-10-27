@@ -8,6 +8,7 @@ import {
   BarChart3,
   Sparkles,
   Settings,
+  Scale,
   LucideIcon,
 } from 'lucide-react';
 import { Role, Permission } from '@/types/security';
@@ -51,7 +52,7 @@ export const WORKSPACE_NAV_ITEMS: readonly NavItemConfig[] = [
     label: 'Billing & POS',
     href: '/billing',
     icon: Receipt,
-    ready: false,
+    ready: true,
     requiredPermissions: ['BILLING_CREATE'],
   },
   {
@@ -73,6 +74,13 @@ export const WORKSPACE_NAV_ITEMS: readonly NavItemConfig[] = [
     href: '/reports',
     icon: BarChart3,
     ready: false,
+    requiredPermissions: ['ACCOUNTS_VIEW'],
+  },
+  {
+    label: 'Bank Reconciliation',
+    href: '/reconciliation',
+    icon: Scale,
+    ready: true,
     requiredPermissions: ['ACCOUNTS_VIEW'],
   },
   {

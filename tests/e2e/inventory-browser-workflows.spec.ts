@@ -160,7 +160,7 @@ test.describe('Suvarna Milestone 3B — Inventory Browser End-to-End Workflows',
     await expect(detailDialog).toBeVisible();
 
     // Verify piece specifications
-    await expect(detailDialog.getByText(`TAG: ${TEST_TAG}`)).toBeVisible();
+    await expect(detailDialog.getByText(new RegExp(`(Tag Code|TAG):\\s*${TEST_TAG}`))).toBeVisible();
     await expect(detailDialog.getByText('HUID: E2E901')).toBeVisible();
     await expect(detailDialog.getByText('45.500 g')).toBeVisible();
     await expect(detailDialog.getByText('1.500 g')).toBeVisible();

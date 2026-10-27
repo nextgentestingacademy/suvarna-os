@@ -161,7 +161,7 @@ export function WorkspaceShell({
     <WorkspaceContext.Provider value={{ activeBranch, setActiveBranch, user, availableBranches: branchesList }}>
       <div className="min-h-screen flex flex-col bg-[#fff8f1] text-[#25203a]">
         {/* Top Demo Notice Ribbon */}
-        <aside aria-label="Demo mode notice" className="bg-[#421b48] text-white px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-inner">
+        <aside aria-label="Demo mode notice" className="no-print bg-[#421b48] text-white px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-inner">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 bg-[#d49a24] text-[#25203a] font-bold rounded text-[10px] uppercase tracking-wider">
               DEMO PREVIEW
@@ -178,7 +178,7 @@ export function WorkspaceShell({
         </aside>
 
         {/* Top Application Bar */}
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-[#eee2dc] px-4 lg:px-6 h-16 flex items-center justify-between shadow-xs">
+        <header className="no-print sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-[#eee2dc] px-4 lg:px-6 h-16 flex items-center justify-between shadow-xs">
           {/* Brand & Mobile Toggle */}
           <div className="flex items-center gap-3">
             <button
@@ -307,13 +307,13 @@ export function WorkspaceShell({
         <div className="flex-1 flex min-h-[calc(100vh-8rem)]">
           {/* Sidebar */}
           <aside
-            className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-[#eee2dc] transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:block ${
+            className={`no-print fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-[#eee2dc] transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:block ${
               isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
             }`}
           >
-            <div className="h-full flex flex-col justify-between p-4">
+            <div className="h-full flex flex-col p-4 overflow-hidden">
               {/* Navigation Items */}
-              <div className="space-y-1">
+              <div className="space-y-1 flex-1 overflow-y-auto pr-0.5">
                 <div className="px-3 py-1.5 text-[10px] font-bold text-[#68647a] uppercase tracking-wider">
                   Showroom Operations
                 </div>
@@ -347,28 +347,42 @@ export function WorkspaceShell({
                 })}
               </div>
 
-              {/* Showroom Context Footer Card */}
-              <div className="p-3 bg-[#fffaf5] border border-[#eee2dc] rounded-xl text-xs">
-                <span className="text-[10px] font-bold text-[#d49a24] uppercase tracking-wider block mb-1">
-                  Connected Branch
-                </span>
-                <span className="font-bold text-[#542047] block">{activeBranch.name}</span>
-                <span className="text-[11px] text-[#68647a] block mt-0.5">{activeBranch.address}</span>
-                <div className="mt-2 pt-2 border-t border-[#eee2dc] flex items-center justify-between text-[10px] text-[#68647a]">
-                  <span>GSTIN: 27AAAAA0000A1Z5</span>
-                  <span className="text-[#246743] font-bold">● ONLINE</span>
+              {/* Showroom Context Footer & Action Area */}
+              <div className="pt-4 mt-auto shrink-0 space-y-2 border-t border-[#eee2dc]/80">
+                <div className="p-3 bg-[#fffaf5] border border-[#eee2dc] rounded-xl text-xs shadow-2xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-[#d49a24] uppercase tracking-wider">
+                      Connected Branch
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] text-[#246743] font-bold bg-[#e2f6e8] px-1.5 py-0.5 rounded">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#246743] animate-pulse"></span>
+                      ONLINE
+                    </span>
+                  </div>
+                  <span className="font-bold text-[#542047] block truncate" title={activeBranch.name}>
+                    {activeBranch.name}
+                  </span>
+                  <span className="text-[11px] text-[#68647a] block mt-0.5 line-clamp-2" title={activeBranch.address}>
+                    {activeBranch.address}
+                  </span>
+                  <div className="mt-2.5 pt-2 border-t border-[#eee2dc] flex items-center justify-between text-[10px] text-[#68647a]">
+                    <span className="font-mono text-[9.5px]">GSTIN: 27AAAAA0000A1Z5</span>
+                    <span className="font-mono font-bold text-[#73501b] bg-[#fff0dc] px-1.5 py-0.2 rounded text-[9.5px]">
+                      {activeBranch.code}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Sidebar Sign Out Button */}
-              <button
-                onClick={handleSignOut}
-                disabled={isSigningOut}
-                className="w-full mt-2 py-2 px-3 bg-white hover:bg-[#fff0dc] border border-[#eee2dc] hover:border-[#d49a24] rounded-xl text-xs font-semibold text-[#68647a] hover:text-[#542047] transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                <LogOut className="w-3.5 h-3.5 text-[#b93657]" />
-                <span>{isSigningOut ? 'Signing out...' : 'Sign Out of Showroom'}</span>
-              </button>
+                {/* Sidebar Sign Out Button */}
+                <button
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                  className="w-full py-2 px-3 bg-white hover:bg-[#fff0dc] border border-[#eee2dc] hover:border-[#d49a24] rounded-xl text-xs font-semibold text-[#68647a] hover:text-[#542047] transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-[#b93657]" />
+                  <span>{isSigningOut ? 'Signing out...' : 'Sign Out of Showroom'}</span>
+                </button>
+              </div>
             </div>
           </aside>
 
@@ -376,7 +390,7 @@ export function WorkspaceShell({
           {isMobileMenuOpen && (
             <div
               onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/30 z-30 lg:hidden backdrop-blur-xs"
+              className="no-print fixed inset-0 bg-black/30 z-30 lg:hidden backdrop-blur-xs"
             />
           )}
 
@@ -388,7 +402,7 @@ export function WorkspaceShell({
 
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="fixed bottom-5 right-5 z-50 bg-[#542047] text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs flex items-center gap-2 border border-[#d49a24] animate-in fade-in slide-in-from-bottom-2">
+          <div className="no-print fixed bottom-5 right-5 z-50 bg-[#542047] text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs flex items-center gap-2 border border-[#d49a24] animate-in fade-in slide-in-from-bottom-2">
             <span className="w-2 h-2 rounded-full bg-[#d49a24]" />
             <span>{toastMessage}</span>
           </div>

@@ -13,20 +13,25 @@ datasource db {
 // ==============================================================================
 
 model User {
-  id            String       @id @default(uuid())
-  name          String
-  email         String       @unique
-  emailVerified Boolean      @default(false)
-  image         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  members       Member[]
-  invitations   Invitation[]
-  auditLogs     AuditLog[]
-  stockMovements StockMovement[]
-  customerInteractions CustomerInteraction[]
+  id                           String                @id @default(uuid())
+  name                         String
+  email                        String                @unique
+  emailVerified                Boolean               @default(false)
+  image                        String?
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+  sessions                     Session[]
+  accounts                     Account[]
+  members                      Member[]
+  invitations                  Invitation[]
+  auditLogs                    AuditLog[]
+  stockMovements               StockMovement[]
+  customerInteractions         CustomerInteraction[]
+  invoices                     Invoice[]
+  paymentsReceived             InvoicePayment[]      @relation("PaymentsReceived")
+  journalEntriesCreated        JournalEntry[]        @relation("JournalEntriesCreated")
+  statementImports             BankStatementImport[] @relation("StatementImports")
+  reconciliationMatchesCreated ReconciliationMatch[] @relation("ReconciliationMatchesCreated")
 
   @@map("users")
 }
@@ -81,28 +86,37 @@ model Verification {
 // ==============================================================================
 
 model Organization {
-  id          String       @id @default(uuid())
-  name        String
-  slug        String       @unique
-  logo        String?
-  metadata    String?
-  createdAt   DateTime     @default(now())
-  members     Member[]
-  invitations Invitation[]
-  branches     Branch[]
-  branchAccess MembershipBranchAccess[]
-  auditLogs    AuditLog[]
-  products     Product[]
-  ornaments    Ornament[]
-  stockMovements StockMovement[]
-  customers    Customer[]
-  customerInteractions CustomerInteraction[]
+  id                    String                   @id @default(uuid())
+  name                  String
+  slug                  String                   @unique
+  logo                  String?
+  metadata              String?
+  createdAt             DateTime                 @default(now())
+  members               Member[]
+  invitations           Invitation[]
+  branches              Branch[]
+  branchAccess          MembershipBranchAccess[]
+  auditLogs             AuditLog[]
+  products              Product[]
+  ornaments             Ornament[]
+  stockMovements        StockMovement[]
+  customers             Customer[]
+  customerInteractions  CustomerInteraction[]
+  invoices              Invoice[]
+  invoiceSequences      InvoiceSequence[]
+  ledgerAccounts        LedgerAccount[]
+  journalEntries        JournalEntry[]
+  journalSequences      JournalSequence[]
+  bankAccounts          BankAccount[]
+  statementImports      BankStatementImport[]
+  statementLines        BankStatementLine[]
+  reconciliationMatches ReconciliationMatch[]
 
   // Jewellery Business Domain Extensions
-  legalName   String?
-  gstin       String?
-  pan         String?
-  currency    String       @default("INR")
+  legalName String?
+  gstin     String?
+  pan       String?
+  currency  String  @default("INR")
 
   @@map("organizations")
 }
@@ -113,7 +127,7 @@ model Member {
   organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userId         String
   user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role           String                   // OWNER | MANAGER | ACCOUNTANT | SALES_STAFF
+  role           String // OWNER | MANAGER | ACCOUNTANT | SALES_STAFF
   createdAt      DateTime                 @default(now())
   status         String                   @default("ACTIVE") // ACTIVE | SUSPENDED | INVITED
   branchAccess   MembershipBranchAccess[]
@@ -143,26 +157,30 @@ model Invitation {
 // ==============================================================================
 
 model Branch {
-  id             String                   @id @default(uuid())
-  organizationId String
-  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  code           String                   // e.g. "FORT", "VASHI"
-  addressLine1   String?
-  city           String
-  state          String                   @default("Maharashtra")
-  pincode        String?
-  phone          String?
-  isMainBranch   Boolean                  @default(false)
-  isActive       Boolean                  @default(true)
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  branchAccess   MembershipBranchAccess[]
-  auditLogs      AuditLog[]
-  ornaments      Ornament[]
-  customers      Customer[]
-  movementsFrom  StockMovement[]          @relation("MovementsFrom")
-  movementsTo    StockMovement[]          @relation("MovementsTo")
+  id               String                   @id @default(uuid())
+  organizationId   String
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  code             String // e.g. "FORT", "VASHI"
+  addressLine1     String?
+  city             String
+  state            String                   @default("Maharashtra")
+  pincode          String?
+  phone            String?
+  isMainBranch     Boolean                  @default(false)
+  isActive         Boolean                  @default(true)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  branchAccess     MembershipBranchAccess[]
+  auditLogs        AuditLog[]
+  ornaments        Ornament[]
+  customers        Customer[]
+  movementsFrom    StockMovement[]          @relation("MovementsFrom")
+  movementsTo      StockMovement[]          @relation("MovementsTo")
+  invoices         Invoice[]
+  invoiceSequences InvoiceSequence[]
+  journalEntries   JournalEntry[]
+  bankAccounts     BankAccount[]
 
   @@unique([organizationId, code])
   @@unique([organizationId, id]) // Composite key for cross-tenant database constraint
@@ -189,20 +207,20 @@ model MembershipBranchAccess {
 // ==============================================================================
 
 model AuditLog {
-  id             String        @id @default(uuid())
+  id             String       @id @default(uuid())
   organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   branchId       String?
-  branch         Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branch         Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
   userId         String?
-  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action         String        // CREATE | UPDATE | DELETE | ACCESS_DENIED | LOGIN | LOGOUT
-  entityType     String        // Branch | Member | Organization | User
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action         String // CREATE | UPDATE | DELETE | ACCESS_DENIED | LOGIN | LOGOUT
+  entityType     String // Branch | Member | Organization | User
   entityId       String
-  changedFields  Json?         // Sensitive keys (passwords, tokens, secrets) redacted before persist
+  changedFields  Json? // Sensitive keys (passwords, tokens, secrets) redacted before persist
   ipAddress      String?
   userAgent      String?
-  createdAt      DateTime      @default(now())
+  createdAt      DateTime     @default(now())
 
   @@index([organizationId, createdAt])
   @@index([organizationId, entityType, entityId])
@@ -217,11 +235,11 @@ model Product {
   id             String       @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sku            String       // Unique design code within business (e.g. "NK-22018")
-  name           String       // e.g. "Heritage Royal Kundan Choker"
-  category       String       // "Necklaces", "Bangles", "Earrings", "Bridal", "Chains", "Pendants", "Rings"
+  sku            String // Unique design code within business (e.g. "NK-22018")
+  name           String // e.g. "Heritage Royal Kundan Choker"
+  category       String // "Necklaces", "Bangles", "Earrings", "Bridal", "Chains", "Pendants", "Rings"
   metalType      String       @default("GOLD") // "GOLD", "SILVER", "PLATINUM"
-  purity         String       @default("22K")  // "24K", "22K", "18K", "14K"
+  purity         String       @default("22K") // "24K", "22K", "18K", "14K"
   description    String?
   imageUrl       String?
   isActive       Boolean      @default(true)
@@ -248,14 +266,14 @@ model Ornament {
   branch            Branch          @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Restrict)
   productId         String
   product           Product         @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
-  tagCode           String          // Unique barcode / tag identifier within business (e.g. "TAG-4001")
-  huid              String?         // 6-character alphanumeric BIS hallmark identifier
+  tagCode           String // Unique barcode / tag identifier within business (e.g. "TAG-4001")
+  huid              String? // 6-character alphanumeric BIS hallmark identifier
   metalType         String          @default("GOLD")
   purity            String          @default("22K")
   grossWeight       Decimal         @db.Decimal(10, 3) // Grams to milligram precision (e.g. 48.500)
   stoneWeight       Decimal         @default(0.000) @db.Decimal(10, 3) // Grams (e.g. 3.200)
   netWeight         Decimal         @db.Decimal(10, 3) // Grams (e.g. 45.300) = gross - stone
-  makingChargeType  String?         // "PER_GRAM", "PERCENTAGE", "FIXED"
+  makingChargeType  String? // "PER_GRAM", "PERCENTAGE", "FIXED"
   makingChargeValue Decimal?        @db.Decimal(12, 2)
   costAmount        Decimal?        @db.Decimal(12, 2) // Wholesale / acquisition rate
   priceAmount       Decimal?        @db.Decimal(12, 2) // Indicative showroom price
@@ -263,6 +281,7 @@ model Ornament {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   movements         StockMovement[]
+  invoiceItems      InvoiceItem[]
 
   @@unique([organizationId, tagCode])
   @@unique([organizationId, id]) // Composite key for cross-tenant FK verification
@@ -286,9 +305,9 @@ model StockMovement {
   fromBranch     Branch?      @relation("MovementsFrom", fields: [organizationId, fromBranchId], references: [organizationId, id], onDelete: Restrict)
   toBranchId     String?
   toBranch       Branch?      @relation("MovementsTo", fields: [organizationId, toBranchId], references: [organizationId, id], onDelete: Restrict)
-  movementType   String       // "INWARD", "TRANSFER", "RESERVATION", "CANCEL_RESERVATION", "SALE", "RETURN"
-  reason         String?      // Notes or reason for stock movement
-  metadata       Json?        // Structured adjustment payload { adjustmentType, before: {...}, after: {...} }
+  movementType   String // "INWARD", "TRANSFER", "RESERVATION", "CANCEL_RESERVATION", "SALE", "RETURN"
+  reason         String? // Notes or reason for stock movement
+  metadata       Json? // Structured adjustment payload { adjustmentType, before: {...}, after: {...} }
   userId         String?
   user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now())
@@ -308,10 +327,10 @@ model Customer {
   organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   primaryBranchId String?
   primaryBranch   Branch?               @relation(fields: [organizationId, primaryBranchId], references: [organizationId, id], onDelete: Restrict)
-  customerCode    String?               // e.g. "CUST-1001", optional unique readable code within tenant
-  name            String                // Full legal or preferred customer name
-  phone           String                // Contact number as formatted
-  normalizedPhone String                // Normalized 10-digit number for search & duplicate detection
+  customerCode    String? // e.g. "CUST-1001", optional unique readable code within tenant
+  name            String // Full legal or preferred customer name
+  phone           String // Contact number as formatted
+  normalizedPhone String // Normalized 10-digit number for search & duplicate detection
   alternatePhone  String?
   email           String?
   addressLine1    String?
@@ -319,16 +338,17 @@ model Customer {
   city            String?
   state           String?               @default("Maharashtra")
   pincode         String?
-  pan             String?               // Indian Income Tax PAN (e.g. ABCDE1234F) for KYC >= 2 Lakhs
+  pan             String? // Indian Income Tax PAN (e.g. ABCDE1234F) for KYC >= 2 Lakhs
   dateOfBirth     DateTime?
   anniversary     DateTime?
   segment         String                @default("RETAIL") // "RETAIL" | "VIP" | "BRIDAL" | "GOLD_SIP" | "REPEAT"
-  notes           String?               // Retail preferences, ring/bangle sizes, staff notes
-  preferences     Json?                 // Structured preferences: metalType, ringSize, etc.
+  notes           String? // Retail preferences, ring/bangle sizes, staff notes
+  preferences     Json? // Structured preferences: metalType, ringSize, etc.
   isActive        Boolean               @default(true)
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   interactions    CustomerInteraction[]
+  invoices        Invoice[]
 
   @@unique([organizationId, id]) // Composite key for cross-tenant FK verification
   @@index([organizationId, normalizedPhone])
@@ -357,4 +377,359 @@ model CustomerInteraction {
   @@map("customer_interactions")
 }
 
+// ==============================================================================
+// BILLING, POINT OF SALE & TAX INVOICING
+// ==============================================================================
 
+model Invoice {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Restrict)
+  customerId     String?
+  customer       Customer?    @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  invoiceNumber  String // e.g. "INV/FORT/26-27/0001"
+  fiscalYear     String // e.g. "2026-2027"
+  sequenceNumber Int // Monotonic sequential counter per branch & fiscal year
+  idempotencyKey String? // Client/server idempotency key to prevent double checkout
+  invoiceDate    DateTime     @default(now())
+  status         String       @default("COMPLETED") // "COMPLETED" | "CANCELLED" | "REFUNDED"
+
+  // Customer snapshot at time of sale
+  customerName    String
+  customerPhone   String?
+  customerPan     String? // Preserved KYC PAN
+  customerAddress String?
+  customerCity    String?
+  customerState   String? // For tax jurisdiction
+  customerPincode String?
+
+  // Financial totals & breakdown
+  currency       String   @default("INR")
+  subtotal       Decimal  @db.Decimal(14, 2)
+  discountAmount Decimal  @default(0.00) @db.Decimal(12, 2)
+  taxableAmount  Decimal  @db.Decimal(14, 2)
+  isInterState   Boolean  @default(false)
+  cgstAmount     Decimal  @default(0.00) @db.Decimal(12, 2)
+  sgstAmount     Decimal  @default(0.00) @db.Decimal(12, 2)
+  igstAmount     Decimal  @default(0.00) @db.Decimal(12, 2)
+  totalTax       Decimal  @db.Decimal(12, 2)
+  roundOff       Decimal  @default(0.00) @db.Decimal(6, 2)
+  grandTotal     Decimal  @db.Decimal(14, 2)
+  paidAmount     Decimal  @default(0.00) @db.Decimal(14, 2)
+  balanceAmount  Decimal  @default(0.00) @db.Decimal(14, 2)
+  paymentStatus  String   @default("PAID") // "PAID" | "PARTIAL" | "UNPAID"
+  notes          String?
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items    InvoiceItem[]
+  payments InvoicePayment[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, branchId, invoiceNumber])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, customerId, invoiceDate])
+  @@index([organizationId, branchId, invoiceDate])
+  @@index([organizationId, status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id             String   @id @default(uuid())
+  organizationId String
+  invoiceId      String
+  invoice        Invoice  @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Cascade)
+  ornamentId     String
+  ornament       Ornament @relation(fields: [organizationId, ornamentId], references: [organizationId, id], onDelete: Restrict)
+
+  // Ornament immutable snapshot
+  tagCode     String
+  huid        String?
+  productName String
+  sku         String
+  category    String
+  metalType   String
+  purity      String
+  grossWeight Decimal @db.Decimal(10, 3)
+  stoneWeight Decimal @default(0.000) @db.Decimal(10, 3)
+  netWeight   Decimal @db.Decimal(10, 3)
+
+  // Pricing inputs and breakdown
+  pricingMode        String  @default("WEIGHT_BASED") // "WEIGHT_BASED" | "FIXED_PRICE"
+  ratePerGram        Decimal @db.Decimal(12, 2)
+  metalValue         Decimal @db.Decimal(12, 2)
+  makingChargeType   String // "PER_GRAM" | "PERCENTAGE" | "FIXED"
+  makingChargeRate   Decimal @db.Decimal(12, 2)
+  makingChargeAmount Decimal @db.Decimal(12, 2)
+  stoneCharges       Decimal @default(0.00) @db.Decimal(12, 2)
+  itemDiscount       Decimal @default(0.00) @db.Decimal(12, 2)
+  taxableAmount      Decimal @db.Decimal(12, 2)
+  gstRate            Decimal @default(3.00) @db.Decimal(5, 2)
+  gstAmount          Decimal @db.Decimal(12, 2)
+  totalAmount        Decimal @db.Decimal(12, 2)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, invoiceId, ornamentId])
+  @@index([organizationId, ornamentId])
+  @@map("invoice_items")
+}
+
+model InvoicePayment {
+  id               String   @id @default(uuid())
+  organizationId   String
+  invoiceId        String
+  invoice          Invoice  @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Cascade)
+  paymentMethod    String // "CASH" | "UPI" | "CARD" | "BANK_TRANSFER" | "CHEQUE"
+  amount           Decimal  @db.Decimal(14, 2)
+  transactionRef   String? // UPI UTR, POS terminal reference, cheque number
+  paymentDate      DateTime @default(now())
+  notes            String?
+  receivedByUserId String?
+  receivedByUser   User?    @relation("PaymentsReceived", fields: [receivedByUserId], references: [id], onDelete: SetNull)
+
+  reconciliationMatches ReconciliationMatch[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, invoiceId])
+  @@index([organizationId, paymentMethod, paymentDate])
+  @@map("invoice_payments")
+}
+
+model InvoiceSequence {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Cascade)
+  fiscalYear     String // e.g. "2026-2027"
+  prefix         String       @default("INV")
+  currentNumber  Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, branchId, fiscalYear])
+  @@map("invoice_sequences")
+}
+
+// ==============================================================================
+// DOUBLE-ENTRY GENERAL LEDGER & ACCOUNTING FOUNDATION
+// ==============================================================================
+
+model LedgerAccount {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code            String
+  name            String
+  classification  String // "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE"
+  normalBalance   String // "DEBIT" | "CREDIT"
+  isSystemAccount Boolean      @default(false)
+  isActive        Boolean      @default(true)
+  description     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  journalLines JournalLine[]
+  bankAccounts BankAccount[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, id])
+  @@index([organizationId, classification])
+  @@index([organizationId, isActive])
+  @@map("ledger_accounts")
+}
+
+model JournalEntry {
+  id              String         @id @default(uuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId        String?
+  branch          Branch?        @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Restrict)
+  entryNumber     String
+  postingDate     DateTime       @default(now())
+  sourceType      String // "INVOICE" | "PAYMENT" | "EXPENSE" | "REVERSAL" | "MANUAL"
+  sourceId        String?
+  idempotencyKey  String?
+  status          String         @default("POSTED") // "DRAFT" | "POSTED" | "VOIDED"
+  narration       String?
+  totalDebit      Decimal        @db.Decimal(14, 2)
+  totalCredit     Decimal        @db.Decimal(14, 2)
+  reversalOfId    String?
+  reversalOf      JournalEntry?  @relation("JournalReversals", fields: [organizationId, reversalOfId], references: [organizationId, id], onDelete: Restrict)
+  reversals       JournalEntry[] @relation("JournalReversals")
+  createdByUserId String?
+  createdByUser   User?          @relation("JournalEntriesCreated", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  lines                 JournalLine[]
+  statementLinesSettled BankStatementLine[]   @relation("StatementLineSettlementJournal")
+  matchesSettled        ReconciliationMatch[] @relation("MatchSettlementJournal")
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, entryNumber])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, postingDate])
+  @@index([organizationId, branchId, postingDate])
+  @@index([organizationId, sourceType, sourceId])
+  @@index([organizationId, status])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             String        @id @default(uuid())
+  organizationId String
+  journalEntryId String
+  journalEntry   JournalEntry  @relation(fields: [organizationId, journalEntryId], references: [organizationId, id], onDelete: Cascade)
+  accountId      String
+  account        LedgerAccount @relation(fields: [organizationId, accountId], references: [organizationId, id], onDelete: Restrict)
+  debitAmount    Decimal       @default(0.00) @db.Decimal(14, 2)
+  creditAmount   Decimal       @default(0.00) @db.Decimal(14, 2)
+  narration      String?
+  lineNumber     Int           @default(1)
+  createdAt      DateTime      @default(now())
+
+  @@unique([organizationId, id])
+  @@index([organizationId, journalEntryId])
+  @@index([organizationId, accountId, createdAt])
+  @@map("journal_lines")
+}
+
+model JournalSequence {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fiscalYear     String // e.g. "2026-2027"
+  prefix         String       @default("JE")
+  currentNumber  Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, fiscalYear])
+  @@map("journal_sequences")
+}
+
+// ==============================================================================
+// BANK & SETTLEMENT RECONCILIATION FOUNDATION (Phase 4D-1)
+// ==============================================================================
+
+model BankAccount {
+  id                  String        @id @default(uuid())
+  organizationId      String
+  organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId            String?
+  branch              Branch?       @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Restrict)
+  accountName         String // e.g. "HDFC Current - Fort", "Pine Labs EDC Settlement"
+  bankName            String // e.g. "HDFC Bank", "ICICI Bank", "Pine Labs", "Razorpay"
+  accountType         String        @default("CURRENT") // "CURRENT" | "SAVINGS" | "OVERDRAFT" | "PAYMENT_GATEWAY" | "EDC_SETTLEMENT"
+  accountNumberMasked String // Safe identifier e.g. "******7890" or terminal MID
+  ifscCode            String?
+  ledgerAccountId     String
+  ledgerAccount       LedgerAccount @relation(fields: [organizationId, ledgerAccountId], references: [organizationId, id], onDelete: Restrict)
+  isActive            Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  statementImports BankStatementImport[]
+  statementLines   BankStatementLine[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, accountName])
+  @@index([organizationId, branchId])
+  @@index([organizationId, ledgerAccountId])
+  @@index([organizationId, isActive])
+  @@map("bank_accounts")
+}
+
+model BankStatementImport {
+  id                 String       @id @default(uuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bankAccountId      String
+  bankAccount        BankAccount  @relation(fields: [organizationId, bankAccountId], references: [organizationId, id], onDelete: Restrict)
+  sourceType         String // "BANK_STATEMENT" | "GATEWAY_SETTLEMENT" | "EDC_SETTLEMENT"
+  fileFormat         String       @default("GENERIC_CSV") // "HDFC_CSV" | "ICICI_CSV" | "SBI_CSV" | "RAZORPAY_CSV" | "PINELABS_CSV" | "GENERIC_CSV"
+  fileName           String
+  fileHash           String // SHA-256 of raw file content to detect duplicate uploads
+  statementStartDate DateTime?
+  statementEndDate   DateTime?
+  totalLinesCount    Int          @default(0)
+  importedByUserId   String?
+  importedByUser     User?        @relation("StatementImports", fields: [importedByUserId], references: [id], onDelete: SetNull)
+  status             String       @default("PENDING") // "PENDING" | "PROCESSED" | "PARTIALLY_RECONCILED" | "RECONCILED"
+  createdAt          DateTime     @default(now())
+
+  lines BankStatementLine[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, bankAccountId, fileHash])
+  @@index([organizationId, bankAccountId, createdAt])
+  @@map("bank_statement_imports")
+}
+
+model BankStatementLine {
+  id                   String              @id @default(uuid())
+  organizationId       String
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  importId             String
+  import               BankStatementImport @relation(fields: [organizationId, importId], references: [organizationId, id], onDelete: Restrict)
+  bankAccountId        String
+  bankAccount          BankAccount         @relation(fields: [organizationId, bankAccountId], references: [organizationId, id], onDelete: Restrict)
+  lineNumber           Int
+  transactionDate      DateTime
+  valueDate            DateTime?
+  description          String // Original bank narration
+  referenceNumber      String? // Extracted UTR, cheque #, or auth code
+  lineType             String // "CREDIT" | "DEBIT"
+  amount               Decimal             @db.Decimal(14, 2)
+  runningBalance       Decimal?            @db.Decimal(14, 2)
+  reconciliationStatus String              @default("UNMATCHED") // "UNMATCHED" | "MATCHED" | "PARTIALLY_MATCHED" | "DISCREPANT" | "IGNORED"
+  duplicateFingerprint String? // Non-unique fingerprint (e.g. SHA256(date+ref+amount+type)) as detection signal
+  createdAt            DateTime            @default(now())
+  settlementJournalId  String?
+  settlementJournal    JournalEntry?       @relation("StatementLineSettlementJournal", fields: [organizationId, settlementJournalId], references: [organizationId, id], onDelete: Restrict)
+  settledAt            DateTime?
+  feeAmount            Decimal?            @db.Decimal(14, 2)
+
+  matches ReconciliationMatch[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, bankAccountId, transactionDate])
+  @@index([organizationId, importId])
+  @@index([organizationId, reconciliationStatus])
+  @@index([organizationId, referenceNumber])
+  @@index([organizationId, duplicateFingerprint])
+  @@index([organizationId, settlementJournalId])
+  @@map("bank_statement_lines")
+}
+
+model ReconciliationMatch {
+  id                  String            @id @default(uuid())
+  organizationId      String
+  organization        Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  statementLineId     String
+  statementLine       BankStatementLine @relation(fields: [organizationId, statementLineId], references: [organizationId, id], onDelete: Restrict)
+  paymentId           String?
+  payment             InvoicePayment?   @relation(fields: [organizationId, paymentId], references: [organizationId, id], onDelete: Restrict)
+  matchType           String // "EXACT_REF_AND_AMOUNT" | "AMOUNT_DATE_WINDOW" | "BATCH_SETTLEMENT" | "MANUAL_MATCH"
+  matchedAmount       Decimal           @db.Decimal(14, 2)
+  status              String            @default("CONFIRMED") // "PROPOSED" | "CONFIRMED" | "REVERSED" | "SETTLED"
+  matchedByUserId     String?
+  matchedByUser       User?             @relation("ReconciliationMatchesCreated", fields: [matchedByUserId], references: [id], onDelete: SetNull)
+  matchedAt           DateTime          @default(now())
+  reason              String?
+  createdAt           DateTime          @default(now())
+  settlementJournalId String?
+  settlementJournal   JournalEntry?     @relation("MatchSettlementJournal", fields: [organizationId, settlementJournalId], references: [organizationId, id], onDelete: Restrict)
+  settledAt           DateTime?
+  feeAmount           Decimal?          @db.Decimal(14, 2)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, statementLineId])
+  @@index([organizationId, paymentId])
+  @@index([organizationId, status])
+  @@index([organizationId, settlementJournalId])
+  @@map("reconciliation_matches")
+}

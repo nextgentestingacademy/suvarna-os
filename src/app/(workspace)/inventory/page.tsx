@@ -24,6 +24,7 @@ import {
   SerializedOrnament,
   getInventoryListingAction,
 } from '@/app/actions/inventory';
+import { getIndicativePrice } from '@/lib/indicative-pricing';
 import { OrnamentDetailModal } from '@/components/workspace/inventory/ornament-detail-modal';
 import { TransferOrnamentModal } from '@/components/workspace/inventory/transfer-ornament-modal';
 import { AddOrnamentModal } from '@/components/workspace/inventory/add-ornament-modal';
@@ -147,6 +148,7 @@ export default function InventoryPage() {
           </h1>
           <p className="text-xs text-[#68647a]">
             Manage catalogue designs, physical tagged pieces, BIS hallmarking HUIDs, and inter-branch movements.
+            Catalogue prices are indicative showroom tag estimates; POS checkout dynamically calculates authoritative billing from active daily bullion rates and making charges.
           </p>
         </div>
 
@@ -359,15 +361,18 @@ export default function InventoryPage() {
                     <span className="absolute top-2.5 left-2.5 px-2 py-0.5 bg-white/90 backdrop-blur border border-[#eee2dc] text-[#542047] font-bold text-[10px] rounded-md shadow-xs">
                       {orn.purity}
                     </span>
-                    <span className="absolute top-2.5 right-2.5 font-mono text-[10px] bg-[#542047] text-[#ffe8a8] px-1.5 py-0.5 rounded font-bold">
-                      {orn.tagCode}
+                    <span className="absolute top-2.5 right-2.5 font-mono text-[10px] bg-[#542047] text-[#ffe8a8] px-2 py-0.5 rounded font-bold shadow-xs flex items-center gap-1">
+                      <span className="text-[9px] uppercase font-sans font-medium text-[#ffe8a8]/80">Tag:</span>
+                      <span>{orn.tagCode}</span>
                     </span>
                   </div>
 
                   {/* Piece Info */}
                   <div className="p-4 space-y-2">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-mono text-[#68647a]">{orn.product?.sku}</span>
+                      <span className="text-[10px] font-mono text-[#68647a] bg-[#fffaf5] px-1.5 py-0.5 rounded border border-[#eee2dc]/80">
+                        <span className="font-semibold text-[#542047] font-sans">Product Code:</span> {orn.product?.sku || 'N/A'}
+                      </span>
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${statusBadge.color}`}>
                         {statusBadge.label}
                       </span>
@@ -395,9 +400,39 @@ export default function InventoryPage() {
                     )}
 
                     <div className="flex items-baseline justify-between pt-1 border-t border-[#eee2dc]/50">
-                      <span className="text-base font-serif font-bold text-[#25203a]">
-                        {formatCurrency(orn.priceAmount)}
-                      </span>
+                      <div>
+                        {(() => {
+                          const pricing = getIndicativePrice(orn);
+                          return (
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="text-[10px] text-[#68647a] block">Indicative Price</span>
+                                {pricing.hasPrice && (
+                                  <span className="text-[9px] font-medium text-[#d49a24] bg-[#fffaf0] px-1 rounded border border-[#f1d394]">
+                                    {pricing.label}
+                                  </span>
+                                )}
+                              </div>
+                              {pricing.hasPrice ? (
+                                <span className="text-base font-serif font-bold text-[#25203a]">
+                                  {pricing.formattedPrice}
+                                </span>
+                              ) : (
+                                <div>
+                                  <span className="text-xs font-semibold text-stone-500 block">
+                                    {pricing.formattedPrice}
+                                  </span>
+                                  {pricing.reason && (
+                                    <span className="text-[10px] text-stone-400 block font-normal">
+                                      ({pricing.reason})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                       {orn.costAmount !== null && (
                         <span className="text-[10px] text-[#68647a] font-mono" title="Confidential wholesale cost">
                           Cost: {formatCurrency(orn.costAmount)}
@@ -439,11 +474,11 @@ export default function InventoryPage() {
               <thead className="bg-[#fffaf5] border-b border-[#eee2dc] text-[#542047] font-serif font-bold">
                 <tr>
                   <th className="py-3 px-4">Tag Code / HUID</th>
-                  <th className="py-3 px-4">Design & SKU</th>
+                  <th className="py-3 px-4">Design & Product Code</th>
                   <th className="py-3 px-4">Purity & Metal</th>
                   <th className="py-3 px-4 text-right">Gross (g)</th>
                   <th className="py-3 px-4 text-right">Net Metal (g)</th>
-                  <th className="py-3 px-4 text-right">Retail Price</th>
+                  <th className="py-3 px-4 text-right">Indicative Price</th>
                   {canManage && <th className="py-3 px-4 text-right">Cost</th>}
                   <th className="py-3 px-4">Showroom</th>
                   <th className="py-3 px-4">Status</th>
@@ -453,10 +488,14 @@ export default function InventoryPage() {
               <tbody className="divide-y divide-[#eee2dc]">
                 {ornaments.map((orn) => {
                   const statusBadge = formatStatus(orn.status);
+                  const pricing = getIndicativePrice(orn);
                   return (
                     <tr key={orn.id} className="hover:bg-[#fffaf5]/50 transition">
                       <td className="py-3 px-4">
-                        <div className="font-mono font-bold text-[#542047]">{orn.tagCode}</div>
+                        <div className="font-mono font-bold text-[#542047]">
+                          <span className="text-[10px] text-[#68647a] font-normal uppercase mr-1">Tag:</span>
+                          {orn.tagCode}
+                        </div>
                         {orn.huid ? (
                           <div className="flex items-center gap-1 text-[10px] text-[#542047] font-mono font-medium">
                             <ShieldCheck className="w-3 h-3 text-[#542047]" />
@@ -468,7 +507,9 @@ export default function InventoryPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-medium text-[#25203a]">{orn.product?.name}</div>
-                        <div className="font-mono text-[10px] text-[#68647a]">{orn.product?.sku}</div>
+                        <div className="font-mono text-[10px] text-[#68647a]">
+                          <span className="font-semibold text-[#542047]">Product Code:</span> {orn.product?.sku || 'N/A'}
+                        </div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-bold text-[#542047]">{orn.purity}</div>
@@ -480,8 +521,20 @@ export default function InventoryPage() {
                       <td className="py-3 px-4 text-right font-mono font-bold text-[#25203a]">
                         {orn.netWeight}
                       </td>
-                      <td className="py-3 px-4 text-right font-bold text-[#542047]">
-                        {formatCurrency(orn.priceAmount)}
+                      <td className="py-3 px-4 text-right">
+                        {pricing.hasPrice ? (
+                          <>
+                            <div className="font-bold text-[#542047]">{pricing.formattedPrice}</div>
+                            <div className="text-[10px] text-[#68647a] font-normal font-sans">{pricing.label}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-medium text-xs text-stone-500">{pricing.formattedPrice}</div>
+                            {pricing.reason && (
+                              <div className="text-[10px] text-stone-400 font-normal font-sans">({pricing.reason})</div>
+                            )}
+                          </>
+                        )}
                       </td>
                       {canManage && (
                         <td className="py-3 px-4 text-right font-mono text-[11px] text-[#68647a]">

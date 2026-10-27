@@ -9,6 +9,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', 'tests/e2e/**'],
     testTimeout: 30000,
     hookTimeout: 30000,
+    fileParallelism: false,
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

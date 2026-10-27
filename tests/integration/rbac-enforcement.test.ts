@@ -9,6 +9,7 @@ import { ReportsContent } from '@/components/workspace/reports-content';
 import { SettingsContent } from '@/components/workspace/settings-content';
 import { AccessDeniedModule } from '@/components/access-denied-module';
 import { ComingSoonModule } from '@/components/coming-soon-module';
+import { ReportsWorkspace } from '@/components/workspace/reports/reports-workspace';
 
 describe('RBAC Navigation & Server-Side Authorization Enforcement', () => {
   const DEV_PASSWORD = 'SuvarnaDev2026!';
@@ -97,14 +98,14 @@ describe('RBAC Navigation & Server-Side Authorization Enforcement', () => {
   describe('2. Server Component Enforcement: /reports (ACCOUNTS_VIEW)', () => {
     it('OWNER is permitted to access ReportsPage', async () => {
       const page = await ReportsContent({ headers: ownerHeaders });
-      expect(page.type).toBe(ComingSoonModule);
-      expect(page.props.moduleName).toBe('Showroom Analytics & Financial Reports');
+      expect(page.type).toBe(ReportsWorkspace);
+      expect(page.props.userRole).toBe('OWNER');
     });
 
     it('ACCOUNTANT is permitted to access ReportsPage', async () => {
       const page = await ReportsContent({ headers: accountantHeaders });
-      expect(page.type).toBe(ComingSoonModule);
-      expect(page.props.moduleName).toBe('Showroom Analytics & Financial Reports');
+      expect(page.type).toBe(ReportsWorkspace);
+      expect(page.props.userRole).toBe('ACCOUNTANT');
     });
 
     it('MANAGER is denied direct access to ReportsPage (renders AccessDeniedModule)', async () => {

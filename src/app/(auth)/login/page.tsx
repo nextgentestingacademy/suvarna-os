@@ -13,10 +13,16 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ returnTo?: string; error?: string }>;
 }) {
-  const reqHeaders = await headers();
-  const session = await auth.api.getSession({
-    headers: reqHeaders,
-  });
+  let session = null;
+  try {
+    const reqHeaders = await headers();
+    session = await auth.api.getSession({
+      headers: reqHeaders,
+    });
+  } catch {
+    // If checking existing session fails due to idle DB connection reset, proceed to login form
+    session = null;
+  }
 
   // If a valid server session already exists, redirect directly away from /login
   if (session?.user) {
