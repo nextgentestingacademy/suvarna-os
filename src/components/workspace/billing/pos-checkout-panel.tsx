@@ -42,7 +42,7 @@ interface PosCheckoutPanelProps {
 
 export interface PaymentEntry {
   id: string;
-  method: 'CASH' | 'UPI' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE';
+  method: 'CASH' | 'UPI' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE' | 'EXCHANGE_CREDIT';
   amount: number;
   ref: string;
 }
@@ -417,6 +417,7 @@ export function PosCheckoutPanel({
                   <option value="CASH">Counter Cash</option>
                   <option value="BANK_TRANSFER">NEFT / RTGS</option>
                   <option value="CHEQUE">Cheque</option>
+                  <option value="EXCHANGE_CREDIT">Old Gold Exchange Credit</option>
                 </select>
 
                 <input
@@ -446,7 +447,11 @@ export function PosCheckoutPanel({
                 type="text"
                 value={p.ref}
                 onChange={(e) => handleUpdatePayment(p.id, 'ref', e.target.value)}
-                placeholder="Transaction / Approval Ref # (e.g. UPI Ref / Card Txn ID)"
+                placeholder={
+                  p.method === 'EXCHANGE_CREDIT'
+                    ? 'Buyback Voucher # (e.g. BB/THANE/26-27/0001)'
+                    : 'Transaction / Approval Ref # (e.g. UPI Ref / Card Txn ID)'
+                }
                 className="w-full px-2.5 py-1 bg-white border border-[#eee2dc] rounded-lg text-[11px] font-mono outline-none text-[#68647a]"
               />
             </div>

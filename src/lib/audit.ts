@@ -61,7 +61,9 @@ export interface RecordAuditParams {
     | 'BankAccount'
     | 'BankStatementImport'
     | 'BankStatementLine'
-    | 'ReconciliationMatch';
+    | 'ReconciliationMatch'
+    | 'MetalRate'
+    | 'BuybackVoucher';
   entityId: string;
   changedFields?: Record<string, unknown>;
   ipAddress?: string;

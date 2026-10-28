@@ -1,30 +1,41 @@
+'use client';
+
 import React from 'react';
-import { ComingSoonModule } from '@/components/coming-soon-module';
+import { useWorkspace } from '@/components/layout/workspace-shell';
+import { BuybackWorkspace } from '@/components/workspace/purchases/buyback-workspace';
+import { Scale } from 'lucide-react';
 
 export default function PurchasesPage() {
+  const { activeBranch, user, availableBranches = [] } = useWorkspace();
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center gap-2 text-sm text-[#8a7a85]">
+          <Scale className="w-5 h-5 animate-pulse text-[#d49a24]" />
+          <span>Loading Gold Buyback Counter...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const branches = availableBranches.map((b) => ({
+    id: b.id,
+    name: b.name,
+    code: b.code,
+  }));
+
   return (
-    <ComingSoonModule
-      moduleName="Gold Purchase & Old Gold Exchange"
-      subtitle="Metal Counter"
-      badge="Milestone 4 Pipeline"
-      description="Evaluate customer old gold, deduct stones/melting loss, test purity, and generate purchase receipts or exchange credit notes."
-      features={[
-        {
-          title: 'Assay & Purity Valuation',
-          description: 'Record gross weight, non-gold stone deduction, and acid/touchstone or XRF assay results to calculate pure gold value.',
-          milestone: 'Milestone 4A',
-        },
-        {
-          title: 'Exchange Credit Vouchers',
-          description: 'Instant conversion of old gold into purchase credit applied toward new retail jewellery invoices.',
-          milestone: 'Milestone 4A',
-        },
-        {
-          title: 'Statutory Compliance & PAN Verification',
-          description: 'Enforce PAN recording thresholds for cash metal purchases in accordance with Indian Income Tax requirements.',
-          milestone: 'Milestone 4B',
-        },
-      ]}
+    <BuybackWorkspace
+      user={{
+        id: user.id || '',
+        name: user.name || 'Staff User',
+        role: user.role || 'SALES_STAFF',
+        tenantSlug: user.tenantSlug || 'kalyan-test',
+        tenantName: user.tenantName || 'Jeweller Workspace',
+      }}
+      branches={branches}
+      activeBranchId={activeBranch?.id}
     />
   );
 }

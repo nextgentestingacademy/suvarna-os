@@ -43,7 +43,7 @@ export class LedgerImmutabilityError extends Error {
 
 export type AccountClassification = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 export type NormalBalance = 'DEBIT' | 'CREDIT';
-export type JournalSourceType = 'INVOICE' | 'PAYMENT' | 'EXPENSE' | 'REVERSAL' | 'MANUAL';
+export type JournalSourceType = 'INVOICE' | 'PAYMENT' | 'EXPENSE' | 'REVERSAL' | 'MANUAL' | 'BUYBACK';
 export type JournalStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
 
 /**
@@ -60,6 +60,7 @@ export const PAYMENT_METHOD_ACCOUNT_MAP: Record<string, string> = {
   CARD: '1030',
   BANK_TRANSFER: '1045',
   CHEQUE: '1050',
+  EXCHANGE_CREDIT: '2120',
 };
 
 export interface StarterAccountDefinition {
@@ -163,6 +164,13 @@ export const STARTER_CHART_OF_ACCOUNTS: readonly StarterAccountDefinition[] = [
     description: 'Physical jewellery stock at wholesale cost or baseline valuation',
   },
   {
+    code: '1220',
+    name: 'Old Gold / Scrap Metal Inventory',
+    classification: 'ASSET',
+    normalBalance: 'DEBIT',
+    description: 'Purchased customer old gold and scrap metal lots awaiting refining or exchange',
+  },
+  {
     code: '2010',
     name: 'Output CGST Payable',
     classification: 'LIABILITY',
@@ -189,6 +197,13 @@ export const STARTER_CHART_OF_ACCOUNTS: readonly StarterAccountDefinition[] = [
     classification: 'LIABILITY',
     normalBalance: 'CREDIT',
     description: 'Unearned customer advance deposits, gold savings scheme receipts, and custom order prepayments',
+  },
+  {
+    code: '2120',
+    name: 'Customer Buyback Payables / Exchange Credit',
+    classification: 'LIABILITY',
+    normalBalance: 'CREDIT',
+    description: 'Outstanding buyback credits issued to customers redeemable against jewellery purchases or pending disbursement',
   },
   {
     code: '3010',
@@ -390,7 +405,7 @@ export class LedgerService {
     // Billing operations (INVOICE / PAYMENT) require BILLING_CREATE or ACCOUNTS_VIEW
     // Reversals require ACCOUNTS_VIEW or BILLING_VOID, and cannot be run by SALES_STAFF
     // Manual operations require ACCOUNTS_VIEW
-    if (input.sourceType === 'INVOICE' || input.sourceType === 'PAYMENT') {
+    if (input.sourceType === 'INVOICE' || input.sourceType === 'PAYMENT' || input.sourceType === 'BUYBACK') {
       if (!hasPermission(ctx.role, 'BILLING_CREATE') && !hasPermission(ctx.role, 'ACCOUNTS_VIEW')) {
         throw new AuthorizationError(
           `Permission denied: Role '${ctx.role}' does not have 'BILLING_CREATE' or 'ACCOUNTS_VIEW' access.`,

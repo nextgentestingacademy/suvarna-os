@@ -59,7 +59,7 @@ export const WORKSPACE_NAV_ITEMS: readonly NavItemConfig[] = [
     label: 'Gold Purchase & Exchange',
     href: '/purchases',
     icon: Repeat,
-    ready: false,
+    ready: true,
     requiredPermissions: ['BILLING_CREATE'],
   },
   {

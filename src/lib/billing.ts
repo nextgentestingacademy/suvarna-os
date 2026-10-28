@@ -6,6 +6,7 @@ import { recordAuditLog } from '@/lib/audit';
 import { Decimal, CurrencyMath } from '@/lib/decimal';
 import { validateCustomerName, isValidIndianPhone } from '@/lib/customer';
 import { ledgerService, PAYMENT_METHOD_ACCOUNT_MAP } from '@/lib/ledger';
+import { buybackService } from '@/lib/buyback';
 
 // ==============================================================================
 // TYPED ERROR CLASSES
@@ -107,7 +108,7 @@ export interface LineItemCalculationResult {
 }
 
 export interface PaymentInput {
-  paymentMethod: 'CASH' | 'UPI' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE';
+  paymentMethod: 'CASH' | 'UPI' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE' | 'EXCHANGE_CREDIT';
   amount: number | string | Decimal;
   transactionRef?: string | null;
   notes?: string | null;
@@ -149,7 +150,7 @@ export interface CreateInvoiceInput {
 export interface RecordInvoicePaymentInput {
   invoiceId: string;
   amount: number | string | Decimal;
-  paymentMethod: 'CASH' | 'UPI' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE';
+  paymentMethod: 'CASH' | 'UPI' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE' | 'EXCHANGE_CREDIT';
   transactionRef?: string | null;
   notes?: string | null;
   idempotencyKey?: string | null;
@@ -392,7 +393,7 @@ export function calculateInvoiceTotals(
     if (amt.lessThanOrEqualTo(0)) {
       throw new BillingValidationError('Payment amount must be greater than zero.');
     }
-    const validMethods = ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER', 'CHEQUE'];
+    const validMethods = ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'EXCHANGE_CREDIT'];
     if (!validMethods.includes(p.paymentMethod)) {
       throw new BillingValidationError(`Invalid payment method: ${p.paymentMethod}`);
     }
@@ -817,12 +818,31 @@ export class BillingService {
       // Step G: Create Payments
       if (input.payments && input.payments.length > 0) {
         for (const p of input.payments) {
+          const pAmount = new Decimal(p.amount).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+          // Atomic Exchange Credit Voucher Redemption Guard
+          if (p.paymentMethod === 'EXCHANGE_CREDIT') {
+            if (!p.transactionRef || !p.transactionRef.trim()) {
+              throw new BillingValidationError(
+                'Exchange credit tender requires a valid Buyback Voucher number.',
+                'MISSING_VOUCHER_REF'
+              );
+            }
+            await buybackService.redeemBuybackVoucherCredit(tx, ctx, {
+              voucherNumber: p.transactionRef.trim(),
+              amount: pAmount,
+              invoiceId: invoice.id,
+              customerId,
+              customerPhone,
+            });
+          }
+
           await tx.invoicePayment.create({
             data: {
               organizationId: ctx.tenantId,
               invoiceId: invoice.id,
               paymentMethod: p.paymentMethod,
-              amount: new Decimal(p.amount).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toString(),
+              amount: pAmount.toString(),
               transactionRef: p.transactionRef?.trim() || null,
               notes: p.notes?.trim() || null,
               receivedByUserId: ctx.userId,
@@ -1209,7 +1229,7 @@ export class BillingService {
       throw new BillingValidationError('Payment amount must be greater than zero.', 'INVALID_AMOUNT');
     }
 
-    const validMethods = ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER', 'CHEQUE'];
+    const validMethods = ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'EXCHANGE_CREDIT'];
     if (!validMethods.includes(input.paymentMethod)) {
       throw new BillingValidationError(
         `Unsupported payment method: '${input.paymentMethod}'. Supported: ${validMethods.join(', ')}.`,
@@ -1287,6 +1307,23 @@ export class BillingService {
           const newPaidAmount = new Decimal(invoice.paidAmount).plus(paymentAmount);
           const newBalanceAmount = currentBalance.minus(paymentAmount);
           const newPaymentStatus = newBalanceAmount.isZero() ? 'PAID' : 'PARTIAL';
+
+          // Atomic Exchange Credit Voucher Redemption Guard
+          if (input.paymentMethod === 'EXCHANGE_CREDIT') {
+            if (!input.transactionRef || !input.transactionRef.trim()) {
+              throw new BillingValidationError(
+                'Exchange credit tender requires a valid Buyback Voucher number.',
+                'MISSING_VOUCHER_REF'
+              );
+            }
+            await buybackService.redeemBuybackVoucherCredit(tx, ctx, {
+              voucherNumber: input.transactionRef.trim(),
+              amount: paymentAmount,
+              invoiceId: invoice.id,
+              customerId: invoice.customerId,
+              customerPhone: invoice.customerPhone,
+            });
+          }
 
           // 3. Create InvoicePayment record
           const payment = await tx.invoicePayment.create({

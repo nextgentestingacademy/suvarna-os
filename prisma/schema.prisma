@@ -32,6 +32,10 @@ model User {
   journalEntriesCreated        JournalEntry[]        @relation("JournalEntriesCreated")
   statementImports             BankStatementImport[] @relation("StatementImports")
   reconciliationMatchesCreated ReconciliationMatch[] @relation("ReconciliationMatchesCreated")
+  metalRatesCreated            MetalRate[]           @relation("MetalRatesCreated")
+  buybackVouchersCreated       BuybackVoucher[]      @relation("BuybackVouchersCreated")
+  buybackVouchersOperated      BuybackVoucher[]      @relation("BuybackVouchersOperated")
+  buybackVouchersApproved      BuybackVoucher[]      @relation("BuybackVouchersApproved")
 
   @@map("users")
 }
@@ -111,6 +115,9 @@ model Organization {
   statementImports      BankStatementImport[]
   statementLines        BankStatementLine[]
   reconciliationMatches ReconciliationMatch[]
+  metalRates            MetalRate[]
+  buybackVouchers       BuybackVoucher[]
+  buybackSequences      BuybackSequence[]
 
   // Jewellery Business Domain Extensions
   legalName String?
@@ -181,6 +188,9 @@ model Branch {
   invoiceSequences InvoiceSequence[]
   journalEntries   JournalEntry[]
   bankAccounts     BankAccount[]
+  metalRates       MetalRate[]
+  buybackVouchers  BuybackVoucher[]
+  buybackSequences BuybackSequence[]
 
   @@unique([organizationId, code])
   @@unique([organizationId, id]) // Composite key for cross-tenant database constraint
@@ -278,10 +288,11 @@ model Ornament {
   costAmount        Decimal?        @db.Decimal(12, 2) // Wholesale / acquisition rate
   priceAmount       Decimal?        @db.Decimal(12, 2) // Indicative showroom price
   status            String          @default("AVAILABLE") // "AVAILABLE", "RESERVED", "SOLD"
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  movements         StockMovement[]
-  invoiceItems      InvoiceItem[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  movements          StockMovement[]
+  invoiceItems       InvoiceItem[]
+  buybackLotVouchers BuybackVoucher[] @relation("BuybackLotOrnament")
 
   @@unique([organizationId, tagCode])
   @@unique([organizationId, id]) // Composite key for cross-tenant FK verification
@@ -349,6 +360,7 @@ model Customer {
   updatedAt       DateTime              @updatedAt
   interactions    CustomerInteraction[]
   invoices        Invoice[]
+  buybackVouchers BuybackVoucher[]
 
   @@unique([organizationId, id]) // Composite key for cross-tenant FK verification
   @@index([organizationId, normalizedPhone])
@@ -426,8 +438,9 @@ model Invoice {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  items    InvoiceItem[]
-  payments InvoicePayment[]
+  items           InvoiceItem[]
+  payments        InvoicePayment[]
+  buybackVouchers BuybackVoucher[] @relation("ExchangeInvoice")
 
   @@unique([organizationId, id])
   @@unique([organizationId, branchId, invoiceNumber])
@@ -568,6 +581,7 @@ model JournalEntry {
   lines                 JournalLine[]
   statementLinesSettled BankStatementLine[]   @relation("StatementLineSettlementJournal")
   matchesSettled        ReconciliationMatch[] @relation("MatchSettlementJournal")
+  buybackVouchers       BuybackVoucher[]      @relation("BuybackJournalEntry")
 
   @@unique([organizationId, id])
   @@unique([organizationId, entryNumber])
@@ -732,4 +746,130 @@ model ReconciliationMatch {
   @@index([organizationId, status])
   @@index([organizationId, settlementJournalId])
   @@map("reconciliation_matches")
+}
+
+// ==============================================================================
+// METAL RATES CONFIGURATION (Independent Buying & Selling Rates)
+// ==============================================================================
+
+model MetalRate {
+  id              String        @id @default(uuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId        String?
+  branch          Branch?       @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Restrict)
+  metalType       String        // "GOLD" | "SILVER"
+  purity          String        // "24K" | "22K" | "18K" | "14K" | "SILVER"
+  rateType        String        // "BUYING" | "SELLING"
+  ratePerGram     Decimal       @db.Decimal(12, 2)
+  source          String        @default("MANUAL") // "MANUAL" | "FEED" | "IMPORT"
+  effectiveFrom   DateTime      @default(now())
+  effectiveTo     DateTime?
+  isActive        Boolean       @default(true)
+  notes           String?
+  createdByUserId String?
+  createdByUser   User?         @relation("MetalRatesCreated", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  buybackVouchers BuybackVoucher[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, metalType, purity, rateType, isActive])
+  @@index([organizationId, branchId, effectiveFrom])
+  @@map("metal_rates")
+}
+
+// ==============================================================================
+// GOLD & PRECIOUS METAL BUYBACK VOUCHERS
+// ==============================================================================
+
+model BuybackVoucher {
+  id                  String         @id @default(uuid())
+  organizationId      String
+  organization        Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId            String
+  branch              Branch         @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Restrict)
+  voucherNumber       String         // e.g. "BB/THANE/26-27/0001"
+  customerId          String?
+  customer            Customer?      @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  customerName        String         // Full name of seller (customer or walk-in)
+  customerPhone       String         // Contact phone
+  customerAddress     String?
+  customerPan         String?        // Mandatory for netPayable > 2,00,000 (Rule 114B)
+
+  // Metal verification & assay
+  metalType           String         // "GOLD" | "SILVER"
+  purity              String         // "24K" | "22K" | "18K" | "14K" | "SILVER"
+  grossWeight         Decimal        @db.Decimal(10, 3) // In grams
+  stoneWeight         Decimal        @default(0.000) @db.Decimal(10, 3) // Non-metal tare in grams
+  netWeight           Decimal        @db.Decimal(10, 3) // gross - stone
+  testingMethod       String?        // "TOUCHSTONE" | "ACID" | "XRF" | "SPECIFIC_GRAVITY" | "ELECTRONIC"
+  testingNotes        String?
+
+  // Financial computation
+  metalRateId         String?
+  metalRate           MetalRate?     @relation(fields: [organizationId, metalRateId], references: [organizationId, id], onDelete: Restrict)
+  appliedRate         Decimal        @db.Decimal(12, 2) // Buying rate per gram applied
+  rateEffectiveAt     DateTime
+  grossAmount         Decimal        @db.Decimal(14, 2) // netWeight * appliedRate
+  deductionAmount     Decimal        @default(0.00) @db.Decimal(14, 2)
+  deductionReason     String?        // e.g. "Melting loss 1.5%", "Dirt/impurity removal"
+  netPayable          Decimal        @db.Decimal(14, 2) // grossAmount - deductionAmount
+  redeemedAmount      Decimal        @default(0.00) @db.Decimal(14, 2) // Total redeemed against sales invoices
+
+  // Settlement & linking
+  paymentMethod       String         // "CASH" | "BANK_TRANSFER" | "UPI" | "EXCHANGE_CREDIT"
+  paymentReference    String?        // Bank UTR, Cheque #, etc.
+  status              String         @default("COMPLETED") // "COMPLETED" | "SETTLED" | "PARTIALLY_REDEEMED" | "EXCHANGED" | "CANCELLED"
+
+  // Inventory & ledger integration
+  lotOrnamentId       String?
+  lotOrnament         Ornament?      @relation("BuybackLotOrnament", fields: [organizationId, lotOrnamentId], references: [organizationId, id], onDelete: Restrict)
+  journalEntryId      String?
+  journalEntry        JournalEntry?  @relation("BuybackJournalEntry", fields: [organizationId, journalEntryId], references: [organizationId, id], onDelete: Restrict)
+  exchangeInvoiceId   String?
+  exchangeInvoice     Invoice?       @relation("ExchangeInvoice", fields: [organizationId, exchangeInvoiceId], references: [organizationId, id], onDelete: Restrict)
+
+  // Audit & operator tracking
+  idempotencyKey      String?
+  operatorId          String?
+  operator            User?          @relation("BuybackVouchersOperated", fields: [operatorId], references: [id], onDelete: SetNull)
+  createdById         String?
+  createdByUser       User?          @relation("BuybackVouchersCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedById        String?
+  approvedByUser      User?          @relation("BuybackVouchersApproved", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, branchId, voucherNumber])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, customerId])
+  @@index([organizationId, branchId, createdAt])
+  @@index([organizationId, status])
+  @@index([organizationId, lotOrnamentId])
+  @@index([organizationId, journalEntryId])
+  @@index([organizationId, exchangeInvoiceId])
+  @@index([organizationId, approvedById])
+  @@map("buyback_vouchers")
+}
+
+// ==============================================================================
+// BUYBACK VOUCHER SEQUENCES
+// ==============================================================================
+
+model BuybackSequence {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [organizationId, branchId], references: [organizationId, id], onDelete: Cascade)
+  fiscalYear     String       // e.g. "2026-2027"
+  prefix         String       @default("BB")
+  currentNumber  Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, branchId, fiscalYear])
+  @@map("buyback_sequences")
 }
